@@ -1,0 +1,31 @@
+{
+  "//": "Merged into .claude/settings.json by /orchestrator-init, each part only with the owner's OK. Keys starting with // are notes and are not copied.",
+  "permissions": {
+    "deny": [
+      "Read(**/bin/**)",
+      "Read(**/obj/**)",
+      "Read(**/node_modules/**)",
+      "Read(**/dist/**)",
+      "Read(**/target/**)",
+      "Agent(Plan)"
+    ]
+  },
+  "//permissions": "Deny reads of build output: they are large and never the source of truth. Keep only the folders this project has. Agent(Plan) denies the built-in planning subagent, whose exploration /write-plan already does in the main session.",
+  "promptCacheTtl": "1h",
+  "//promptCacheTtl": "Keeps the main session's prompt cache for an hour, so an orchestrator waiting on a 10-minute stage does not rewrite its context. Only if this Claude Code version knows the key; subagents stay on 5 minutes (ledger I1).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard-write.cjs\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
+  "//hooks": "Only for checkouts with CRLF line endings (Windows, core.autocrlf): Write saves LF, so overwriting a CRLF file with Write changes every line. The hook refuses it and asks for Edit. Needs Node."
+}
