@@ -7,12 +7,20 @@ Standard library only. Reads ~/.claude/projects/<project-slug>*/ (or $CLAUDE_CON
   analyze.py metrics  SESSION [SESSION ...] [--json]     per-agent and per-role cost of sessions + their subagents
   analyze.py timeline FILE [--from N] [--to N] [--grep RE]   one line per turn of one transcript
   analyze.py ttl      SESSION [SESSION ...]              what-if: subagents on a 1-hour instead of a 5-minute cache
+  analyze.py receipt  [SESSION ...] [--since DAYS] [--all-projects] [--redact] [--svg F] [--png F]
+                                                         a shareable cost receipt (latest session by default)
 
 SESSION is a session id (prefix is enough), a .jsonl path, or a session directory.
 
-Cost is in relative units, not money: input tokens of the strongest model = 1. Defaults follow
-Anthropic's published price ratios (cache write 5m 1.25x, 1h 2x, cache read 0.1x, output 5x;
-Sonnet 0.6x and Haiku 0.2x of Opus). Override with --weights / --model-weights if they change.
+Units are relative cost: input tokens of the strongest model = 1, with fixed ratios (cache write 5m
+1.25x, 1h 2x, cache read 0.1x, output 5x; Sonnet 0.6x and Haiku 0.2x of Opus), so runs on different
+models and dates stay comparable. Override with --weights / --model-weights.
+Dollars ("API $", the receipt) use each model's own published API prices (PRICES below): what the
+tokens would cost on the API, not what a subscription pays.
+
+Runs on its own, without the rest of the setup:
+  curl -sSLO https://raw.githubusercontent.com/scaretos/orchestrator-setup/main/template/.claude/skills/workflow-review/analyze.py
+  python3 analyze.py receipt
 """
 import argparse
 import collections
@@ -27,6 +35,41 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 TOKEN_WEIGHTS = {"in": 1.0, "c5": 1.25, "c1h": 2.0, "cr": 0.1, "out": 5.0}
+
+# First-party API prices, USD per million tokens: input, output, cache write 5 min, cache write 1 h, cache read.
+# Longest matching prefix wins. Subscriptions do not pay these, so the receipt calls them "API-equivalent".
+# Source: Anthropic's published pricing as of 2026-11 (Haiku 5.5 cache prices assumed at the usual ratios).
+PRICES = {
+    "claude-fable-5-2": (8.0, 40.0, 10.0, 16.0, 0.20),
+    "claude-mythos-5-2": (8.0, 40.0, 10.0, 16.0, 0.20),
+    "claude-fable-5-1": (10.0, 50.0, 12.5, 20.0, 0.25),
+    "claude-mythos-5-1": (10.0, 50.0, 12.5, 20.0, 0.25),
+    "claude-fable-5": (10.0, 50.0, 12.5, 20.0, 1.00),
+    "claude-mythos-5": (10.0, 50.0, 12.5, 20.0, 1.00),
+    "claude-opus-5-5": (4.0, 20.0, 5.0, 8.0, 0.20),
+    "claude-opus-5": (5.0, 25.0, 6.25, 10.0, 0.50),
+    "claude-opus-4": (5.0, 25.0, 6.25, 10.0, 0.50),
+    "claude-sonnet-5-5": (2.0, 10.0, 2.5, 4.0, 0.10),
+    "claude-sonnet-5": (2.0, 10.0, 2.5, 4.0, 0.20),
+    "claude-sonnet-4": (3.0, 15.0, 3.75, 6.0, 0.30),
+    "claude-haiku-5-5": (0.10, 0.50, 0.125, 0.20, 0.01),
+    "claude-haiku-4": (1.0, 5.0, 1.25, 2.0, 0.10),
+}
+DEFAULT_PRICE = PRICES["claude-opus-5-5"]
+
+
+def price_of(model):
+    m = (model or "").lower()
+    best = max((k for k in PRICES if m.startswith(k)), key=len, default=None)
+    return PRICES[best] if best else DEFAULT_PRICE
+
+
+def usd_parts(u, model, fast=False):
+    """API-equivalent dollars of one turn, per token type."""
+    p_in, p_out, p_c5, p_c1h, p_cr = price_of(model)
+    k = 2 if fast else 1  # fast mode is billed at twice the standard rate
+    return {"in": k * u["in"] * p_in / 1e6, "out": k * u["out"] * p_out / 1e6, "c5": k * u["c5"] * p_c5 / 1e6,
+            "c1h": k * u["c1h"] * p_c1h / 1e6, "cr": k * u["cr"] * p_cr / 1e6}
 MODEL_WEIGHTS = {"opus": 1.0, "fable": 1.0, "sonnet": 0.6, "haiku": 0.2}
 COMMANDS = ("write-plan", "execute-plan", "workflow-review")
 
@@ -190,26 +233,63 @@ def analyze_file(path, tw, mw, classes):
     peak = 0
     prev_t = prev_ctx = None
     gaps5 = gaps60 = 0
-    cold = []  # (turn, tokens written, gap seconds)
+    cold = []  # cache misses: (turn, tokens of the earlier context written again, gap seconds, after idle?)
+    cold_usd = idle_usd = 0.0  # what the misses cost beyond reading the same tokens from a warm cache
+    usd = collections.Counter()
+    ctxs, cr_prices = [], []
     models = collections.Counter()
     for i, tr in enumerate(turns, 1):
         u = usage_split(tr["usage"])
         w = model_weight(tr["model"], mw)
         models[tr["model"]] += 1
         units += w * sum(tw[k] * u[k] for k in tw)
+        fast = (tr["usage"].get("speed") == "fast")
+        usd.update(usd_parts(u, tr["model"], fast))
         for k in ("in", "c5", "c1h", "cr", "out"):
             tot[k] += u[k]
         ctx = u["in"] + u["cr"] + u["write"]
         peak = max(peak, ctx)
+        ctxs.append(ctx)
+        cr_prices.append(price_of(tr["model"])[4] * (2 if fast else 1) / 1e6)
         t = ts(tr["time"])
         gap = (t - prev_t).total_seconds() if (t and prev_t) else 0
         if gap > 300:
             gaps5 += 1
         if gap > 3600:
             gaps60 += 1
-        if prev_ctx and prev_ctx > 20_000 and u["write"] > 0.5 * prev_ctx:
-            cold.append((i, u["write"], int(gap)))
+        # A cache miss: the cache served less than half of what the previous turn had. (A large write alone is
+        # not one: a big tool result is written once on top of a warm cache.) Only the earlier context that
+        # had to be written again counts; the new content would have been written anyway.
+        if prev_ctx and prev_ctx > 20_000 and u["cr"] < 0.5 * prev_ctx:
+            missed = prev_ctx - u["cr"]
+            p = price_of(tr["model"])
+            one_hour = u["c1h"] > u["c5"]
+            cost = missed * ((p[3] if one_hour else p[2]) - p[4]) / 1e6
+            idle = gap > (3600 if one_hour else 300)  # longer than the cache lives: it expired while waiting
+            cold.append((i, missed, int(gap), idle))
+            cold_usd += cost
+            idle_usd += cost if idle else 0.0
         prev_ctx, prev_t = ctx, (t or prev_t)
+
+    # Carry cost: a tool result stays in the context and is read again on every later turn, until the
+    # context shrinks (compaction). Tokens estimated as characters / 4.
+    by_id = {x["id"]: x for x in tools}
+    carries = []
+    for r in results:
+        start = r["turn"]  # index of the first turn that sees this result
+        if start >= len(ctxs) or r["chars"] < 2000:
+            continue
+        tok = r["chars"] / 4
+        end = start
+        while end < len(ctxs) and ctxs[end] >= 0.6 * ctxs[start]:
+            end += 1
+        cost = tok * sum(cr_prices[start:end])
+        use = by_id.get(r["id"]) or {}
+        inp = use.get("input") or {}
+        what = inp.get("file_path") or inp.get("command") or inp.get("pattern") or inp.get("url") or ""
+        carries.append({"tool": use.get("name", "?"), "what": str(what), "tokens": int(tok),
+                        "turns": end - start, "usd": cost})
+    carries.sort(key=lambda c: -c["usd"])
 
     tool_count = collections.Counter(x["name"] for x in tools)
     read_keys = collections.Counter()
@@ -251,6 +331,9 @@ def analyze_file(path, tw, mw, classes):
         "file": os.path.basename(path), "first_time": turns[0]["time"] if turns else None, "role": role, "description": meta.get("description", ""),
         "requested_model": meta.get("model"), "models": dict(models),
         "turns": len(turns), "units": units, "tokens": dict(tot), "peak_ctx": peak,
+        "usd": sum(usd.values()), "usd_parts": dict(usd), "cold_usd": cold_usd, "top_carries": carries[:5],
+        "idle_misses": sum(1 for c in cold if c[3]), "idle_usd": idle_usd,
+        "ctx_sum": sum(ctxs), "last_time": turns[-1]["time"] if turns else None,
         "cold_rewrites": len(cold), "cold_rewrite_tokens": sum(c[1] for c in cold),
         "cold_detail": cold[:8], "gaps_gt5m": gaps5, "gaps_gt1h": gaps60,
         "minutes": round((t1 - t0).total_seconds() / 60, 1) if t0 and t1 else 0,
@@ -290,17 +373,18 @@ def cmd_metrics(a):
         print(json.dumps(rows, indent=1, default=str))
         return
     total = sum(r["units"] for r in rows) or 1
-    print(f"# Metrics: {len(rows)} transcripts, {total / 1e6:.2f}M units\n")
+    usd_total = sum(r["usd"] for r in rows)
+    print(f"# Metrics: {len(rows)} transcripts, {total / 1e6:.2f}M units, ${usd_total:,.2f} API-equivalent\n")
     print("Units: input of the strongest model = 1; see analyze.py header. Measured from transcripts.\n")
     roles = collections.defaultdict(lambda: collections.Counter())
     for r in rows:
         g = roles[r["role"]]
-        g["agents"] += 1; g["turns"] += r["turns"]; g["units"] += r["units"]
+        g["agents"] += 1; g["turns"] += r["turns"]; g["units"] += r["units"]; g["usd"] += r["usd"]
         g["cold"] += r["cold_rewrite_tokens"]; g["follow_ups"] += r["follow_ups"]
-    print("| role | agents | turns | units (M) | share | cold-rewrite tokens | follow-up rounds |")
-    print("|---|---:|---:|---:|---:|---:|---:|")
+    print("| role | agents | turns | units (M) | share | API $ | cold-rewrite tokens | follow-up rounds |")
+    print("|---|---:|---:|---:|---:|---:|---:|---:|")
     for role, g in sorted(roles.items(), key=lambda kv: -kv[1]["units"]):
-        print(f"| {role} | {g['agents']} | {g['turns']} | {g['units'] / 1e6:.2f} | {g['units'] / total:.0%} | {g['cold']:,} | {g['follow_ups']} |")
+        print(f"| {role} | {g['agents']} | {g['turns']} | {g['units'] / 1e6:.2f} | {g['units'] / total:.0%} | {g['usd']:,.2f} | {g['cold']:,} | {g['follow_ups']} |")
     tok = collections.Counter()
     for r in rows:
         w = model_weight(next(iter(r["models"]), ""), mw)
@@ -310,7 +394,8 @@ def cmd_metrics(a):
     print("\nCost split: " + ", ".join(f"{k} {v / tt:.0%}" for k, v in
                                       sorted(tok.items(), key=lambda kv: -kv[1])) +
           "  (cr = cache read, c5/c1h = cache write 5 min / 1 h, out = output)\n")
-    print("Columns: cold rewrites = turns that wrote more than half the previous context again (expired cache);"
+    print("Columns: cold rewrites = cache misses, turns whose cache read covered less than half the previous context"
+          " (tokens = earlier context written again);"
           " rounds = follow-up messages after the first prompt; rules = CLAUDE.md/rule files loaded by path;"
           " outcomes = verdict or status of each report, in order.\n")
     print("| session | agent | role | model | turns | units (M) | peak ctx | cold rewrites | gaps >5m/>1h | min | rounds | first edit | reads (dup) | plan reads | rules | errors | outcomes |")
@@ -342,13 +427,13 @@ def cmd_runs(a):
             mentioned = collections.Counter()
             for line in open(p, encoding="utf-8", errors="replace"):
                 if '"timestamp"' in line:
-                    m = re.search(r'"timestamp":"([^"]+)"', line)
+                    m = re.search(r'"timestamp":\s*"([^"]+)"', line)
                     if m:
                         t0 = t0 or m.group(1); t1 = m.group(1)
                 if "plan.md" in line:
                     found = written_rx.findall(line)
                     mentioned.update(found)
-                    if '"name":"Write"' in line:
+                    if re.search(r'"name":\s*"Write"', line):
                         written.update(found)
                 if "<command-name>" not in line:
                     continue
@@ -476,7 +561,7 @@ def cmd_ttl(a):
                 agg[role][0] += w * (1.25 * cc + 0.1 * cr)
                 t = ts(tr["time"])
                 gap = (t - prev_t).total_seconds() if (t and prev_t) else 0
-                if prev_ctx and 300 < gap <= 3600 and cc > 0.5 * prev_ctx:
+                if prev_ctx and 300 < gap <= 3600 and cr < 0.5 * prev_ctx:  # a miss a 1 h cache would avoid
                     cr2 = min(prev_ctx, cr + cc)
                     agg[role][1] += w * (2 * (cr + cc - cr2) + 0.1 * cr2)
                     agg[role][2] += 1
@@ -488,6 +573,193 @@ def cmd_ttl(a):
     print("|---|---:|---:|---:|---:|")
     for role, (act, sim, n) in sorted(agg.items()):
         print(f"| {role} | {act / 1e6:.2f} | {sim / 1e6:.2f} | {(sim - act) / 1e6:+.2f} | {n} |")
+
+
+# ---------- receipt ----------
+
+REPO_URL = "github.com/scaretos/orchestrator-setup"
+W = 44  # receipt width in characters
+
+
+def session_files(a):
+    """The main transcripts the receipt covers: named sessions, the last N days, or the latest one."""
+    if a.sessions:
+        return [resolve_session(r, a.project, a.extra_dir)[0] or r for r in a.sessions]
+    base = os.path.join(config_dir(), "projects")
+    dirs = glob.glob(os.path.join(base, "*")) if a.all_projects else project_dirs(a.project, a.extra_dir)
+    files = [p for d in dirs for p in glob.glob(os.path.join(d, "*.jsonl")) if ".orphaned-" not in p]
+    if not files:
+        sys.exit(f"no Claude Code sessions found under {base}" + ("" if a.all_projects else
+                 f" for {a.project} (run it from your project folder, or pass --all-projects)"))
+    if a.since:
+        cutoff = dt.datetime.now().timestamp() - a.since * 86400
+        return sorted(p for p in files if os.path.getmtime(p) >= cutoff)
+    return [max(files, key=os.path.getmtime)]
+
+
+def money(x):
+    return f"${x:,.2f}" if x < 1000 else f"${x:,.0f}"
+
+
+def row(label, value):
+    label = label[:W - 3 - len(value)]  # the value always shows; a long label is cut
+    return " " + label + " " * max(1, W - 2 - len(label) - len(value)) + value
+
+
+def duration(minutes):
+    h, m = divmod(int(minutes), 60)
+    return f"{h}h {m}m" if h else f"{m}m"
+
+
+def build_receipt(a):
+    classes = [(n, re.compile(r, re.I)) for n, r in DEFAULT_CLASSES]
+    mains = session_files(a)
+    rows = []
+    for p in mains:
+        rows.append(analyze_file(p, TOKEN_WEIGHTS, MODEL_WEIGHTS, classes))
+        for s in sorted(glob.glob(os.path.join(p[:-6], "subagents", "agent-*.jsonl"))):
+            rows.append(analyze_file(s, TOKEN_WEIGHTS, MODEL_WEIGHTS, classes))
+    rows = [r for r in rows if r["turns"]]
+    if not rows:
+        sys.exit("those sessions have no model turns yet")
+    parts = collections.Counter()
+    for r in rows:
+        parts.update(r["usd_parts"])
+    total = sum(parts.values()) or 1e-9
+    turns = sum(r["turns"] for r in rows)
+    subs = sum(1 for r in rows if r["role"] != "main")
+    n_main = sum(1 for r in rows if r["role"] == "main")
+    times = sorted(t for r in rows for t in (r["first_time"], r["last_time"]) if t)
+    minutes = sum(r["minutes"] for r in rows if r["role"] == "main")
+    peak = max(r["peak_ctx"] for r in rows)
+    avg_ctx = sum(r["ctx_sum"] for r in rows) / turns
+    idle_n = sum(r["idle_misses"] for r in rows)
+    idle_usd = sum(r["idle_usd"] for r in rows)
+    other_n = sum(r["cold_rewrites"] for r in rows) - idle_n
+    other_usd = sum(r["cold_usd"] for r in rows) - idle_usd
+    carries = sorted((c for r in rows for c in r["top_carries"]), key=lambda c: -c["usd"])
+
+    def name(c):
+        if a.redact:
+            return c["tool"]
+        w = c["what"].replace("\\", "/")
+        if c["tool"] not in ("Read", "Edit", "Write"):
+            return c["tool"]  # commands can hold paths and secrets; the tool name is enough
+        return f"{c['tool']} {w.rsplit('/', 1)[-1]}"
+
+    if a.since:
+        title = f"LAST {a.since} DAYS · {n_main} sessions"
+    else:
+        title = f"session {os.path.basename(mains[0])[:8]} · {(times[0] if times else '')[:10]}"
+    L = ["=" * W, "CLAUDE CODE RECEIPT".center(W), title.center(W), "-" * W]
+    L.append(f" {n_main} session{'s' if n_main != 1 else ''}" + (f" · {subs} subagents" if subs else "") + f" · {turns:,} turns")
+    L.append(f" {duration(minutes)} in sessions · peak context {peak // 1000}k")
+    L.append("-" * W)
+    L.append(row("Re-reading context (cache reads)", money(parts["cr"])))
+    L.append(row("Writing context (cache writes)", money(parts["c5"] + parts["c1h"])))
+    L.append(row("Output", money(parts["out"])))
+    L.append(row("Fresh input", money(parts["in"])))
+    L.append("-" * W)
+    L.append(row("TOTAL (API-equivalent)", money(total)))
+    L.append("=" * W)
+    L.append(" Every turn re-sends the whole context:")
+    L.append(f" on average {avg_ctx / 1000:,.0f}k tokens, {turns:,} times.")
+    L.append("")
+    if idle_n:
+        L.append(row(f"Cache expired while idle: {idle_n}x ({idle_usd / total:.0%})", money(idle_usd)))
+    if other_n:
+        L.append(row(f"Other cache misses: {other_n}x ({other_usd / total:.0%})", money(other_usd)))
+    if carries:
+        L.append(" Priciest tool results (estimated):")
+        for c in carries[:3]:
+            L.append(row(f"  {name(c)}", f"{c['tokens'] // 1000}k x {c['turns']} = {money(c['usd'])}"))
+    if subs:
+        top = max(rows, key=lambda r: r["usd"])
+        L.append(row(f"Priciest agent: {top['role']}", money(top["usd"])))
+    L.append("-" * W)
+    tips = []
+    if idle_usd / total > 0.05:
+        tips.append((idle_usd, ["Idle over 5 min rewrites the cache.",
+                                "Run long commands in the foreground."]))
+    if carries and carries[0]["usd"] / total > 0.02:
+        tips.append((carries[0]["usd"], ["Big results are re-paid every turn.",
+                                         "Read line ranges, not whole files."]))
+    if peak > 200_000:
+        tips.append((total * 0.1, ["Big contexts are re-paid every turn.",
+                                   "Split work into small fresh agents."]))
+    tip = max(tips, key=lambda t: t[0])[1] if tips else ["Batch independent tool calls:",
+                                                         "one turn instead of three."]
+    L += [" TIP: " + tip[0], "      " + tip[1], "-" * W, "measured with orchestrator-setup".center(W), REPO_URL.center(W), "=" * W]
+    return L
+
+
+def write_svg(lines, path):
+    fs, lh, pad = 16, 22, 28
+    cw = fs * 0.6
+    width = int(W * cw + 2 * pad)
+    height = int(len(lines) * lh + 2 * pad)
+    teeth = "".join(f"L{x},{height + (8 if (x // 12) % 2 else 0)} " for x in range(0, width + 12, 12))
+    esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height + 10}" viewBox="0 0 {width} {height + 10}">',
+           f'<path d="M0,0 L{width},0 L{width},{height} {teeth}L0,{height} Z" fill="#fffdf6"/>',
+           '<g font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="16" fill="#222">']
+    for i, s in enumerate(lines):
+        weight = ' font-weight="bold"' if s.lstrip().startswith(("TOTAL", "CLAUDE CODE RECEIPT")) else ""
+        if s.lstrip().startswith("Cache expired"):
+            weight = ' font-weight="bold" fill="#c0392b"'
+        out.append(f'<text x="{pad}" y="{pad + (i + 1) * lh - 6}" xml:space="preserve"{weight}>{esc(s)}</text>')
+    out += ["</g>", "</svg>"]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(out))
+
+
+def write_png(lines, path):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        sys.exit("--png needs Pillow (pip install pillow); --svg needs nothing")
+    candidates = ["DejaVuSansMono.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+                  "/System/Library/Fonts/Menlo.ttc", "C:/Windows/Fonts/consola.ttf", "Menlo.ttc", "consola.ttf"]
+    canvas_w, margin = 1080, 90
+    fs = int(min((canvas_w - 2 * margin - 60) / (W * 0.6), 34))
+    lh = int(fs * 1.4)
+    paper_w, paper_h = int(W * fs * 0.6 + 60), len(lines) * lh + 60
+    canvas_h = max(1350, paper_h + 2 * margin)
+    font = bold = None
+    for c in candidates:
+        try:
+            font = ImageFont.truetype(c, fs)
+            break
+        except OSError:
+            continue
+    font = font or ImageFont.load_default()
+    img = Image.new("RGB", (canvas_w, canvas_h), "#16181d")
+    d = ImageDraw.Draw(img)
+    x0, y0 = (canvas_w - paper_w) // 2, (canvas_h - paper_h) // 2
+    pts = [(x0, y0), (x0 + paper_w, y0), (x0 + paper_w, y0 + paper_h)]
+    pts += [(x, y0 + paper_h + (14 if (i % 2) else 0)) for i, x in enumerate(range(x0 + paper_w, x0 - 1, -18))]
+    pts += [(x0, y0 + paper_h)]
+    d.polygon(pts, fill="#fffdf6")
+    for i, s in enumerate(lines):
+        y = y0 + 30 + i * lh
+        color = "#c0392b" if s.lstrip().startswith("Cache expired") else "#222222"
+        d.text((x0 + 30, y), s, font=font, fill=color)
+        if s.lstrip().startswith(("TOTAL", "CLAUDE CODE RECEIPT", "Cache expired")):
+            d.text((x0 + 31, y), s, font=font, fill=color)  # poor man's bold
+    img.save(path)
+
+
+def cmd_receipt(a):
+    lines = build_receipt(a)
+    print("\n".join(lines))
+    if a.svg:
+        write_svg(lines, a.svg)
+        print(f"\nsaved {a.svg}")
+    if a.png:
+        write_png(lines, a.png)
+        print(f"\nsaved {a.png}")
+    if not a.redact:
+        print("\nBefore posting: tool results show file names and commands. --redact hides them.", file=sys.stderr)
 
 
 def main():
@@ -503,8 +775,16 @@ def main():
     t = sp.add_parser("timeline"); t.add_argument("file"); t.add_argument("--from", dest="frm", type=int)
     t.add_argument("--to", type=int); t.add_argument("--grep")
     x = sp.add_parser("ttl"); x.add_argument("sessions", nargs="+")
+    rc = sp.add_parser("receipt", help="a shareable cost receipt of a session, or of the last N days")
+    rc.add_argument("sessions", nargs="*", help="session ids; default: the latest session of this project")
+    rc.add_argument("--since", type=int, metavar="DAYS", help="every session of the last DAYS days")
+    rc.add_argument("--all-projects", action="store_true", help="look in every project, not just this one")
+    rc.add_argument("--redact", action="store_true", help="hide file names and commands")
+    rc.add_argument("--svg", metavar="FILE"); rc.add_argument("--png", metavar="FILE", help="needs Pillow")
     a = ap.parse_args()
-    if a.cmd == "runs":
+    if a.cmd == "receipt":
+        cmd_receipt(a)
+    elif a.cmd == "runs":
         a.commands = tuple(c.strip() for c in a.commands.split(","))
         cmd_runs(a)
     elif a.cmd == "metrics":
