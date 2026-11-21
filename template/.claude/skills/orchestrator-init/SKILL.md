@@ -16,9 +16,9 @@ In one message: Grep `\{\{[A-Z_]+\}\}` and `ADAPT:` under `.claude/` (files with
 
 One parallel batch of Glob, Read (small files, or ranges) and short read-only commands:
 - **Stack and commands:** build files at the root and one level down (`package.json`, `*.sln`/`*.csproj`, `Cargo.toml`, `go.mod`, `pyproject.toml`/`setup.cfg`, `pom.xml`, `build.gradle*`, `Makefile`, `CMakeLists.txt`), and CI workflows (`.github/workflows/*`, `.gitlab-ci.yml`, `azure-pipelines.yml`): CI usually holds the project's true build and test commands. Find the test framework and its filter syntax (`--filter`, `-k`, `-t`, `--grep`, `-run`).
-- **Environment:** OS and shell (Windows PowerShell 5.1, PowerShell 7, bash, zsh), Python 3 command (`python3 --version`, `python --version`, `py -3 --version`), Node (`node --version`, for the optional hook), `git symbolic-ref refs/remotes/origin/HEAD` (default branch), the remote's host and whether `gh` (or `glab`) is installed, `git config core.autocrlf`.
+- **Environment:** OS and shell (Windows PowerShell 5.1, PowerShell 7, bash, zsh), Python 3 command (`python3 --version`, `python --version`, `py -3 --version`), Node (`node --version`, for the optional hook), `git remote -v` and `git symbolic-ref refs/remotes/origin/HEAD` (default branch; with no remote, the current branch), the remote's host and whether `gh` (or `glab`) is installed, `git config core.autocrlf`. No remote is fine: `/execute-plan` then works on local branches and skips pushes and PRs; set `PR_CMD` to "none (no remote)" and say so in the report.
 - **Layout:** the top-level folders and what each holds (one line each), build output folders, existing folder `CLAUDE.md` files.
-- **Language tooling:** whether an LSP plugin is active for the main language (the agents use `findReferences`; without one they fall back to Grep).
+- **Language tooling:** whether a language server is active: an `LSP` tool in your own tool list means a plugin is installed; call its `documentSymbol` on one source file to see that it serves this language. The agents use `findReferences` and fall back to Grep without one; if none is active, name the Claude Code LSP plugin for the main language in the report.
 
 In a large monorepo, one `Explore` call with concrete questions (packages, their test commands, shared libraries) is cheaper than many reads.
 

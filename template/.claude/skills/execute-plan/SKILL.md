@@ -15,7 +15,7 @@ You coordinate and decide. You do not implement, explore, or read source code, d
 2. **Resume:** if the log records a worktree, enter it (`EnterWorktree` with `path`) and run `git status --porcelain`. Skip steps 3 to 5.
    - Clean: continue after the last committed stage.
    - Not clean: the next stage was interrupted. Never discard or redo it on your own; ask the user. Either continue it: spawn `stage-implementer` for that stage and add "The working tree holds this stage's unfinished changes. Read `git diff` and `git status`, check what is done against the stage's steps, and continue from there; do not start over." Or discard the changes, only on the user's word.
-3. **Drift check:** `git fetch origin`, then `git diff --stat <plan base> origin/{{DEFAULT_BRANCH}} -- <every file the plan names>`. If a planned file changed, stop and show the user which: a stale plan produces confident wrong code.
+3. **Drift check:** `git fetch origin`, then `git diff --stat <plan base> origin/{{DEFAULT_BRANCH}} -- <every file the plan names>`. If a planned file changed, stop and show the user which: a stale plan produces confident wrong code. No remote (`git remote` prints nothing): compare with the local `{{DEFAULT_BRANCH}}` instead, here and in step 4, and skip every push and PR below; the branch stays local and the report says so.
 4. **Worktree:** `EnterWorktree` with name `<feature-slug>` (a fresh branch from `origin/{{DEFAULT_BRANCH}}`). Prepare it before any agent opens a source file: `{{WORKTREE_PREP}}`. A language server that starts on an unprepared tree reports missing packages for the whole session. Record worktree path, branch and start commit in the log.
 5. If the working tree is not clean, stop and ask the user.
 

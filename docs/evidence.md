@@ -17,7 +17,7 @@ A large feature was built with a main session directing general-purpose subagent
 | Total | 87.5M units; hit the usage limit 5 times |
 | Split | implementing agents 70%, main session 28%, scouts 1% |
 | Cost by token type | cache reads 68%, cache writes 29%, output 2% |
-| Cold rewrites | 9.3M tokens of context written again after the cache expired |
+| Cache misses | 35 turns wrote 10.0M tokens of earlier context again; 29 of them after a pause longer than the cache lifetime, about 24% of the build's API-equivalent cost |
 | Median implementing agent | 87 turns, peak context 297k, 2.34M units |
 
 Measured in more depth at the time:
@@ -66,6 +66,7 @@ Each of these came from a `/workflow-review`-style analysis. The rule is in the 
 ## Measure your own
 
 ```bash
+python .claude/skills/workflow-review/analyze.py receipt --since 7     # the quick look: API-equivalent cost of your week
 python .claude/skills/workflow-review/analyze.py runs
 python .claude/skills/workflow-review/analyze.py metrics <planning session> <execution session>
 python .claude/skills/workflow-review/analyze.py timeline <transcript.jsonl> --grep "Read|test"

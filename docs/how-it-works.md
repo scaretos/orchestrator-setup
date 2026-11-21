@@ -1,8 +1,8 @@
 # How it works, and why
 
-This page explains the cost model the workflow is built on, then each part of the workflow and the reason behind its rules. The skills and agents state the rules briefly; this is the long form for when you want to change one.
+The workflow's goal is good work on large codebases: every decision made before the code, each stage on the model it needs, every stage reviewed before it's committed. Keeping each context small serves that goal, and it also makes every turn cheaper. This page starts with how a session's context and cost behave, because many rules follow from it, then explains each part of the workflow and the reason behind its rules. The skills and agents state the rules briefly; this is the long form for when you want to change one.
 
-## The cost model
+## How context and cost behave
 
 Every turn of a Claude Code session sends the whole conversation again: system prompt, tool definitions, `CLAUDE.md`, every file read, every tool result. Prompt caching makes the repeated part cheaper, but not free:
 
