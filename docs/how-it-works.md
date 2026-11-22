@@ -109,3 +109,41 @@ Research runs on Sonnet because extracting evidence from transcripts needs care,
 ## Adapting: `/orchestrator-init`
 
 The skills and agents ship with placeholders (`{{TEST_CMD}}`) and ADAPT blocks (the plan template's architecture checklist, the agents' *This machine* traps). `/orchestrator-init` fills them from your build files, CI and environment, and records the values in `.claude/orchestrator/profile.md`. Literal, project-specific instructions matter: an agent told "run the tests" searches for how; an agent given `npm test -- -t "<filter>" 2>&1 | tail -5` doesn't.
+
+## Auditing and optimizing the context: `/restructure-docs`
+
+A large codebase often carries two problems at once: documentation written for agents in files Claude Code never loads by itself, and documentation that no longer matches the implementation. A per-project guide named `X-CLAUDE.md`, a `docs/` folder, or a 30 KB root `CLAUDE.md` is only read because an instruction tells an agent to find it, grep its headings and read a range. Even a well-placed instruction can be wrong, outdated, duplicated or incomplete.
+
+`/restructure-docs` is a one-time audit and optimization of the Claude Code knowledge base, not a text migration. It keeps two kinds of truth separate: implementation, tests, build configuration and CI establish observable behavior, while owner decisions and architectural records establish intended behavior and design constraints. Existing documentation is historical context, not automatic authority. If the two disagree, the skill reports the discrepancy instead of silently treating either as correct. It is owner-invoked and has two permission gates:
+
+1. **Warn, then ask.** Before reading anything, it explains the change, the risk and the reversibility, and asks whether to start the read-only audit.
+2. **Audit, then ask.** It inventories instructions as three separate buckets — modifiable Claude Code instructions, external evidence that is only read, and references that may need updating — then presents a findings table and the proposed destinations. Nothing is written until the owner approves that plan.
+
+The audit covers architecture, build and publish pipelines, tests, coding conventions, dependency injection, serialization and reflection, error handling and logging, security boundaries, feature flags, critical workflows, data, integrations, constraints and the development environment. A convention seen in one file is a hypothesis, not a project rule; a workaround is not an architectural pattern. The investigation is targeted by architectural boundary and cross-reference density, not just representative sampling.
+
+The goal is to reduce repeated exploration and prevent mistakes, not to describe everything the code contains. High-priority knowledge is architectural boundaries, critical invariants, non-obvious dependencies, dangerous pitfalls and cross-component workflows. Build/test commands and important configuration are medium priority. Obvious code structure and generic framework knowledge are low priority. Knowledge is promoted only when its expected value exceeds its context cost.
+
+What it changes follows from the evidence. Incorrect or outdated instructions are corrected. Duplicates are consolidated. Irrelevant context is removed with a justification. Missing knowledge is added when implementation, records or the owner support it. Persistent knowledge and procedures are kept apart:
+
+- root `CLAUDE.md` for universal context, architecture overview, essential commands, pointers and traps — what the planner and orchestrator need;
+- a nested `CLAUDE.md` only where content is genuinely folder-wide;
+- `.claude/rules/` with `paths:` for technical facts, constraints and conventions that should load with matching code;
+- `.claude/agents/` for responsibilities and role-specific operating instructions;
+- `.claude/skills/` for reusable procedures and workflows.
+
+Only project-specific factual context inside agents and skills may be corrected; operational instructions, stage contracts, permissions, responsibilities and workflow logic are immutable here, and apparent operational problems are separate `/workflow-review` recommendations. Human documentation stays in place. Orchestrator-managed sections of the root `CLAUDE.md` — the headings `/orchestrator-init` merges, ADAPT blocks and workflow instructions — are preserved. References inside Claude Code files are updated; references elsewhere change only when a removed agent-only document makes them invalid, and only with approval.
+
+Editorial changes — grammar, clarity, formatting and rewording without changed meaning — do not need another approval. Adding a fact, removing a fact not listed for removal, moving content, changing rule path coverage, or merging or splitting rules does.
+
+Verification is layered:
+
+- `check_rules.py` expands every `paths:` glob against `git ls-files`, reports dead globs, lists files that load several rules, and probes files — including one that should match zero rules — to show simulated matching. That is not proof of runtime loading: the model must be checked against the Claude Code version in use and its documentation.
+- `verify_move.py` is a review aid, not a proof. For a section moved unchanged, `loss --strict` is a gate. For a rewrite, `loss` and `facts` show which identifiers, numbers, paths or quoted names disappeared, so each can be restored or justified. Decisions, invariants, behavioral constraints and workflows are compared semantically.
+- An independent read-only reviewer receives the approved findings and mapping, original and resulting documentation, relevant source files and tests, and the verification results. It inspects implementation, tests and configuration directly rather than validating the implementer's reasoning. A finding that changes the approved plan needs the owner's approval before it is applied.
+- Unresolved uncertainties are reported separately from the applied changes.
+
+`split_docs.py` remains an optional mechanical aid for sections that are already correct and only need a new home. Corrections and additions are made with evidence, not by preserving text.
+
+The result is the layout the rest of the workflow assumes: a lean root `CLAUDE.md`, a short `CLAUDE.md` in each folder that needs one, and topic rules that load only when matching code is opened. It changes no product code, settings or hooks, and it works on a dedicated branch after verifying the default branch and base commit. It opens a draft PR when the repository has a remote and the tooling for it; otherwise the completed branch stays local. Documentation-only changes do not trigger expensive application-wide integration or deployment tests unless the change affects something those tests validate.
+
+If the repository is already well structured, the skill audits it instead of restructuring it, and proposes targeted corrections for wrong, missing, duplicated or contradictory facts.

@@ -94,7 +94,7 @@ The workflow keeps these numbers down because it keeps every context small: in i
 
 ## Quick start
 
-Requirements: Claude Code with skills and subagents, git, Python 3 (for `/workflow-review`). Optional: Node (CRLF guard hook), `gh` (draft PRs), an LSP plugin for your language (exact `findReferences`).
+Requirements: Claude Code with skills and subagents, git, Python 3 (for `/workflow-review` and `/restructure-docs`). Optional: Node (CRLF guard hook), `gh` (draft PRs), an LSP plugin for your language (exact `findReferences`).
 
 ```bash
 git clone https://github.com/scaretos/orchestrator-setup.git
@@ -111,6 +111,8 @@ Then, in Claude Code inside your project:
 
 It detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). Commit the result on a branch.
 
+If the project already has long documentation that agents have to find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, a `docs/` folder the instructions point at), `/orchestrator-init` will point you at `/restructure-docs`. It audits the Claude Code context against implementation, tests, build configuration and CI, plus explicit owner decisions and architectural records: it verifies existing instructions, corrects or removes what the evidence contradicts, reports disagreements, adds only high-value missing knowledge, and restructures the result into a lean root or folder `CLAUDE.md` plus path-scoped `.claude/rules/`. It changes nothing before you approve the audit and the mapping, and human documentation stays in place.
+
 ## Daily use
 
 | Command | When |
@@ -119,6 +121,7 @@ It detects your build and test commands, shell, layout and CI, asks only what it
 | `/execute-plan <plan path>` | In a **new** session. Resumable: rerun it after an interruption, a usage limit or a new milestone. |
 | `/retro` | At the end of any piece of work (the orchestrator runs it itself). Proposes rule updates; writes nothing without your OK. |
 | `/workflow-review [runs]` | Every 2–3 executions. Measures and proposes workflow changes; writes nothing without your OK. |
+| `/restructure-docs` | Once, after setup, if the project has hand-read guides or a large `CLAUDE.md`. Audits the context against the code, then corrects, consolidates and restructures it; shows the audit first. |
 | `/orchestrator-init` | Once after installing; again after upgrading or editing `.claude/orchestrator/profile.md`. |
 | `python3 .claude/skills/workflow-review/analyze.py receipt` | Any time: the cost receipt of your latest session (`--since 7` for the week). |
 
@@ -145,6 +148,7 @@ The hard rule in both loops: **never trade correctness for tokens.** A proposal 
 │   ├── execute-plan/        SKILL.md                 the orchestrator
 │   ├── retro/               SKILL.md                 knowledge loop
 │   ├── workflow-review/     SKILL.md + analyze.py    workflow loop
+│   ├── restructure-docs/    SKILL.md + 4 scripts     audit + optimize project context
 │   └── orchestrator-init/   SKILL.md                 adapts the setup to your project
 ├── agents/
 │   ├── plan-reviewer.md     Opus, read-only

@@ -10,7 +10,7 @@ Context loads by itself as you work; do not go looking for a guide.
 
 - **Per folder:** a folder's `CLAUDE.md` holds what is true for every file in it (its test command, its traps). It loads when you read or edit a file there.
 - **Per topic:** `.claude/rules/*.md`, each with `paths:` frontmatter, loads when you read or edit a file its `paths:` match. To know a topic before touching its code (planning, a review), open the rule file directly.
-- **Workflows:** `/write-plan` + `/execute-plan` (staged agent builds), `/retro` (what a finished piece of work taught), `/workflow-review` (how the workflow itself performed).
+- **Workflows:** `/write-plan` + `/execute-plan` (staged agent builds), `/retro` (what a finished piece of work taught), `/workflow-review` (how the workflow itself performed), `/restructure-docs` (once, to audit and optimize the project context into this layout).
 - A rule or `CLAUDE.md` statement that turned out wrong or incomplete is fixed in the same piece of work.
 
 ## Planning work
