@@ -44,7 +44,7 @@ class TemplateTests(unittest.TestCase):
     def test_skills_and_agents_have_frontmatter(self):
         skills = glob.glob(os.path.join(TEMPLATE, "skills", "*", "SKILL.md"))
         agents = glob.glob(os.path.join(TEMPLATE, "agents", "*.md"))
-        self.assertEqual(len(skills), 5)
+        self.assertEqual(len(skills), 6)
         self.assertEqual(len(agents), 5)
         for path in skills + agents:
             fm = frontmatter(path)
@@ -58,6 +58,48 @@ class TemplateTests(unittest.TestCase):
     def test_skill_names_match_folders(self):
         for path in glob.glob(os.path.join(TEMPLATE, "skills", "*", "SKILL.md")):
             self.assertEqual(frontmatter(path)["name"], os.path.basename(os.path.dirname(path)))
+
+    def test_restructure_docs_is_owner_invoked(self):
+        path = os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md")
+        self.assertEqual(frontmatter(path).get("disable-model-invocation"), "true")
+
+    def test_restructure_docs_scripts_compile(self):
+        import py_compile
+        scripts = glob.glob(os.path.join(TEMPLATE, "skills", "restructure-docs", "*.py"))
+        self.assertGreaterEqual(len(scripts), 4)
+        for path in scripts:
+            with self.subTest(path=os.path.relpath(path, ROOT)):
+                py_compile.compile(path, doraise=True)
+
+    def test_restructure_docs_scripts_are_referenced(self):
+        folder = os.path.join(TEMPLATE, "skills", "restructure-docs")
+        skill = read(os.path.join(folder, "SKILL.md"))
+        for path in glob.glob(os.path.join(folder, "*.py")):
+            self.assertIn(os.path.basename(path), skill)
+
+    def test_restructure_docs_has_two_permission_gates(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
+        self.assertGreaterEqual(skill.count("AskUserQuestion"), 2)
+        self.assertIn("disable-model-invocation: true", skill)
+
+    def test_restructure_docs_steps_and_tables(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
+        steps = re.findall(r"^## (\d)\. ", skill, re.M)
+        self.assertEqual(steps, [str(i) for i in range(8)], "steps 0-7 in order")
+        for column in ("Doc class", "Content class", "Status", "Verdict", "Consumer", "Change", "Original"):
+            with self.subTest(column=column):
+                self.assertIn(f"| {column} |", skill)
+
+    def test_restructure_docs_uses_its_argument_and_saves_the_audit(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
+        self.assertIn("$ARGUMENTS", skill)
+        self.assertIn("{{PLANS_DIR}}/restructure-docs/<date>/audit.md", skill)
+
+    def test_restructure_docs_script_calls_use_the_profile_python(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
+        calls = re.findall(r"^\s*(\S+) \.claude/skills/restructure-docs/\w+\.py", skill, re.M)
+        self.assertTrue(calls)
+        self.assertEqual(set(calls), {"{{PYTHON}}"})
 
 
 if __name__ == "__main__":

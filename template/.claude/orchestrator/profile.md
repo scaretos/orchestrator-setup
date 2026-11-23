@@ -14,13 +14,13 @@ The project-specific values `/orchestrator-init` filled into the skills and agen
 | BUILD_CMD | | stage implementer: quiet build of one project or package |
 | TEST_CMD | | implementer, reviewer, plan template: one filtered test run, output cut to the last lines; `<project>` and `<filter>` stay placeholders for the plan |
 | TEST_FAIL_HINT | | how a failed test run shows in that cut output |
-| GATE_CMD | | final review, plan template: the whole verification |
+| GATE_CMD | | final review, plan template, `/restructure-docs`: the whole verification |
 | GATE_LOG | | where the gate writes its full output |
 | WORKTREE_PREP | | `/execute-plan`: commands that make a fresh worktree buildable (restore, first build, index) |
-| PLANS_DIR | | `/write-plan`, `/execute-plan`: where plans live, outside the repo |
-| DEFAULT_BRANCH | | plan base, PR target |
+| PLANS_DIR | | `/write-plan`, `/execute-plan`, `/restructure-docs` (its `audit.md`): where plans live, outside the repo |
+| DEFAULT_BRANCH | | plan base, PR target, `/restructure-docs` branch base |
 | PR_CMD | | draft PR command |
-| PYTHON | | `/workflow-review`: the Python 3 command |
+| PYTHON | | `/workflow-review`, `/restructure-docs`: the Python 3 command |
 | BUILD_OUTPUT_DIRS | | `Explore`, settings deny list |
 | EXTERNAL_SYSTEMS | | `/write-plan` step 4: systems whose behaviour must be measured, not assumed |
 | UI_CHECK | | `/write-plan` *UI check*: how to see a UI change without a person |
