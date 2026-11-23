@@ -9,6 +9,7 @@
   - `/execute-plan` runs the first member in the feature worktree and gives each other member a worktree at the group base, prepared with `WORKTREE_PREP`. It refuses to commit a file outside a member's list, cherry-picks the members in merge order, and runs every member's verify on the merged tree. A conflict or a failing group check stops the run for the owner and is logged as a planning miss. The resume step handles a group that was interrupted.
   - `stage-implementer` and `stage-reviewer` work in the work tree they are given. A parallel member that needs a file outside its list reports BLOCKED.
   - `workflow-analyst` reports the time groups saved, what they cost, and every group failure as a plan defect.
+  - A switch turns all of this off. `- **Parallel stages:** on | off` sits under the new *Switches* section of `profile.md`, and the skills read it each time they run, so an edit applies to the next plan or execution without re-running `/orchestrator-init`. `/orchestrator-init` asks the owner, recommending `on` only when `WORKTREE_PREP` is quick. With `off`, `/write-plan` skips step 7 and writes no groups, `plan-reviewer` treats any group as a Must fix, and `/execute-plan` runs the members of a group already written one after another in the feature worktree. `--sequential` on `/write-plan` or `/execute-plan` does the same for one run. A missing switch (a profile from before 1.5.0) counts as off.
 
 ## 1.4.0
 

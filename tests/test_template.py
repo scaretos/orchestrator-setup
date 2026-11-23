@@ -137,7 +137,7 @@ class TemplateTests(unittest.TestCase):
                      "Nothing decided during the group", "lockfiles", "migrations"):
             with self.subTest(rule=rule):
                 self.assertIn(rule, step.group(1))
-        self.assertIn("**Parallel groups:**", write_plan, "self-check item")
+        self.assertIn("**Parallel groups** (only when step 7 made a group)", write_plan, "self-check item")
         reviewer = read(os.path.join(agents, "plan-reviewer.md"))
         self.assertIn("**Parallel groups:**", reviewer)
         self.assertIn("check that whole group again", reviewer)
@@ -151,6 +151,36 @@ class TemplateTests(unittest.TestCase):
         for agent in ("stage-implementer.md", "stage-reviewer.md"):
             with self.subTest(agent=agent):
                 self.assertIn("Files per member", read(os.path.join(agents, agent)))
+
+    def test_parallel_stages_switch_turns_every_part_off(self):
+        profile = read(os.path.join(TEMPLATE, "orchestrator", "profile.md"))
+        self.assertRegex(profile, r"(?m)^## Switches$", "switches section")
+        self.assertRegex(profile, r"(?m)^- \*\*Parallel stages:\*\* (on|off)$", "the line the skills grep")
+        readers = {
+            "write-plan": os.path.join(TEMPLATE, "skills", "write-plan", "SKILL.md"),
+            "plan-reviewer": os.path.join(TEMPLATE, "agents", "plan-reviewer.md"),
+            "execute-plan": os.path.join(TEMPLATE, "skills", "execute-plan", "SKILL.md"),
+        }
+        for name, path in readers.items():
+            with self.subTest(reader=name):
+                text = read(path)
+                self.assertIn("Grep `Parallel stages:` in `.claude/orchestrator/profile.md`", text)
+                self.assertIn("missing", text, "a missing switch counts as off")
+        write_plan = read(readers["write-plan"])
+        step = re.search(r"^7\. \*\*Group what is independent\.\*\* (.*?)$", write_plan, re.M).group(1)
+        self.assertTrue(step.startswith("First, the switch"), "the switch comes before any grouping rule")
+        self.assertIn("skip this whole step", step)
+        for name in ("write-plan", "execute-plan"):
+            with self.subTest(sequential=name):
+                text = read(readers[name])
+                self.assertIn("--sequential", frontmatter(readers[name])["argument-hint"])
+                self.assertIn("`--sequential` in the arguments is an option", text)
+        execute = read(readers["execute-plan"])
+        section = re.search(r"^## Parallel groups\n(.*?)^## ", execute, re.M | re.S).group(1)
+        self.assertTrue(section.lstrip().startswith("**Sequential**"), "sequential path before the parallel steps")
+        init = read(os.path.join(TEMPLATE, "skills", "orchestrator-init", "SKILL.md"))
+        self.assertIn("**Parallel stages**", init)
+        self.assertIn("- **Parallel stages:** on` or `off`", init)
 
     def test_restructure_docs_script_calls_use_the_profile_python(self):
         skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))

@@ -1,17 +1,19 @@
 ---
 name: execute-plan
 description: Orchestrate execution of a reviewed, staged {{PROJECT_NAME}} plan. Each stage is implemented by one fresh agent and, depending on its tag, reviewed by another.
-argument-hint: "[path to plan.md]"
+argument-hint: "[path to plan.md] [--sequential]"
 disable-model-invocation: true
 ---
 
 You are the orchestrator for the plan at: $ARGUMENTS
 
+(`--sequential` in the arguments is an option, not part of the path: see *Parallel groups*.)
+
 You coordinate and decide. You do not implement, explore, or read source code, diffs or logs: work from the agents' short reports, and never ask an agent to return file contents. Your context is paid again on every turn, so keep it small. The reviewers are the review: do not add another. Run one stage at a time, except the members of a parallel group the plan names (see *Parallel groups*).
 
 ## Setup
 
-1. Read the plan's header, Decisions, Parallel groups, stage list and Execution log (Grep `^##` in the plan with line numbers to locate sections). The handoff directory is `handoffs/` beside the plan.
+1. Read the plan's header, Decisions, Parallel groups, stage list and Execution log (Grep `^##` in the plan with line numbers to locate sections). The handoff directory is `handoffs/` beside the plan. If the plan has a parallel group, Grep `Parallel stages:` in `.claude/orchestrator/profile.md`: `off`, missing, or `--sequential` in the arguments means sequential (see *Parallel groups*); log which.
 2. **Resume:** if the log records a worktree, enter it (`EnterWorktree` with `path`) and run `git status --porcelain`. Skip steps 3 to 5.
    - Clean: continue after the last committed stage.
    - The log records a parallel group that is not merged yet: check each member's worktree (`git -C <path> status --porcelain`, and whether its branch has a commit after the group base). Committed: it waits for the merge. Clean without a commit: spawn its implementer again. Not clean: ask the user, as below. Then continue at step 5 of *Parallel groups*.
@@ -42,7 +44,9 @@ The members of a parallel group go through these steps at the same time; *Parall
 
 ## Parallel groups
 
-The plan proved each group's members independent: different files, no shared code, separate runtime (its *Parallel groups* section). You run them; you never resolve a clash between them. Each member works in its own worktree, so a half-finished edit in one never breaks another's build or tests, and a reviewer's diff shows only its stage. When the stages before the group are committed:
+**Sequential** (the switch is off, or `--sequential`; see Setup step 1): skip this section. Run the members of each group one after another, in the order listed, in the feature worktree, each as in *For each stage*. That is always safe: a group's members are independent, so the order within it does not matter.
+
+Otherwise: the plan proved each group's members independent: different files, no shared code, separate runtime (its *Parallel groups* section). You run them; you never resolve a clash between them. Each member works in its own worktree, so a half-finished edit in one never breaks another's build or tests, and a reviewer's diff shows only its stage. When the stages before the group are committed:
 
 1. **Base:** record `git rev-parse HEAD` as the group base; it is every member's base commit.
 2. **Worktrees:** the group's first member works in the feature worktree. For each other member, from the feature worktree root: `git worktree add -b <branch>-<stage id> ../<feature-slug>-<stage id> <group base>` (stage id in lower case), then `{{WORKTREE_PREP}}` inside the new worktree. Log each worktree's absolute path and branch.

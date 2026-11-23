@@ -46,6 +46,8 @@ Stages that provably don't touch each other's work can run at the same time. The
 
 Parallelism saves wall-clock time, not tokens: every member costs what it would cost sequentially, plus a worktree prep for each member after the first and one group check. A review fix that adds a file to a member can break its group, so after a revision both the planner and the reviewer check the whole group again.
 
+**Turning it off.** Parallel stages carry risks the sequential path doesn't have: worktree preps, a faster drain on the usage limit, and a stop at the merge when the proof was wrong. So they have a switch, `- **Parallel stages:** on | off` under *Switches* in `.claude/orchestrator/profile.md`. `/orchestrator-init` asks you about it, and the skills read it each time they run, so editing that one word applies to the next plan or execution. With `off`, `/write-plan` skips its grouping step entirely, the plan reviewer treats any group as a Must fix, and `/execute-plan` runs the members of a group already written one after another. That is always safe, since a group's members are independent. For a single run, `/write-plan --sequential …` or `/execute-plan <plan> --sequential` does the same. A profile from before 1.5.0 has no switch, and a missing switch counts as off.
+
 ### Why the plan's layout matters
 
 Agents read the plan by heading: they grep `^##`, then read only the lines of their own sections. So every decision has its own heading, a fact only one stage needs sits in that stage, and nothing is "see elsewhere". Measured before this layout: a third of the plan text agents read was outside their needs.

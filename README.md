@@ -194,7 +194,7 @@ The full reasoning is in [docs/how-it-works.md](docs/how-it-works.md). In short:
 
 **Why are reviews always Opus, even for Sonnet stages?** Measured findings per review were worth more than the review's cost: a defect found in review costs one fix round, while the same defect found later reopens the stages built on it. `/workflow-review` will tell you if that stops being true for your project.
 
-**Can stages run in parallel?** Yes, when the plan proves they're independent; see [Parallel groups](docs/how-it-works.md#parallel-groups). That proof is written and reviewed at planning time, because an execution that finds two stages clashing has nobody who understands both. Parallel stages save time, not tokens: each extra member costs one worktree prep.
+**Can stages run in parallel?** Yes, when the plan proves they're independent; see [Parallel groups](docs/how-it-works.md#parallel-groups). That proof is written and reviewed at planning time, because an execution that finds two stages clashing has nobody who understands both. Parallel stages save time, not tokens: each extra member costs one worktree prep. To turn them off, set `Parallel stages: off` under *Switches* in `.claude/orchestrator/profile.md` (it applies from the next run on), or pass `--sequential` to `/write-plan` or `/execute-plan` for one run.
 
 **Why do plans live outside the repo?** A git worktree can't see untracked files, and plans aren't code to commit. `~/.claude/plans/` is reachable from every worktree.
 

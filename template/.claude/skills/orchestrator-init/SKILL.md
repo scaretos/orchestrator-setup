@@ -10,7 +10,7 @@ Spend little: this runs once. Detect from files, not from long explorations; ask
 
 ## 1. Inventory
 
-In one message: Grep `\{\{[A-Z_]+\}\}` and `ADAPT:` under `.claude/` (files with matches), read `.claude/orchestrator/profile.md`, and check for an existing root `CLAUDE.md`, `.claude/settings.json` and `.claude/rules/`. A profile that already has values means a re-run: reuse them, ask only about empty ones, and skip to step 4.
+In one message: Grep `\{\{[A-Z_]+\}\}` and `ADAPT:` under `.claude/` (files with matches), read `.claude/orchestrator/profile.md`, and check for an existing root `CLAUDE.md`, `.claude/settings.json` and `.claude/rules/`. A profile that already has values means a re-run: reuse them, ask only about empty ones and a missing *Switches* entry (a profile from before 1.5.0 has none; until it is set, parallel stages count as off), and skip to step 4.
 
 ## 2. Detect
 
@@ -40,14 +40,15 @@ Fill every key of the profile table. Rules:
 - **`LAYERS`:** the project's real layers and what each may and may not do, in one line.
 - **`LSP_SETUP`:** per main language, the plugin, the binary it starts and the binary's install command for this OS, e.g. "`pyright-lsp` (project settings) starts `pyright-langserver`: `npm install -g pyright`, then `/reload-plugins`". It tells an agent whose `LSP` calls fail what to ask the owner for. No plugin for the language: "none: Grep only".
 - **`MACHINE_TRAPS`:** known environment traps (locked files while the app runs, services that must be up, slow commands and their real duration, localised tool output). None known: one line "none known yet: `/retro` adds them as they turn up".
+- **Parallel stages** (the *Switches* section of `profile.md`, read at run time, not a placeholder): `on` lets `/write-plan` group stages that provably do not touch each other's work and `/execute-plan` run them at the same time, one worktree per member. The risks: each extra member pays `WORKTREE_PREP` again, agents burn the usage limit faster, and an independence the plan missed stops the run at the merge. `off` runs every stage one after another. Recommend `on` when `WORKTREE_PREP` takes a minute or two, `off` when it is slow or needs services that one machine can run only once. Always ask: it is the owner's risk to take.
 
-Show the owner the filled table in one message and ask with one `AskUserQuestion` (at most 4 questions) only about what detection could not settle: usually the gate's contents if there is no CI, the external systems, the UI check. Offer your detected value as the first, recommended option.
+Show the owner the filled table in one message and ask with one `AskUserQuestion` (at most 4 questions) only about what detection could not settle (usually the gate's contents if there is no CI, the external systems, the UI check) and the parallel stages switch. Offer your detected or recommended value as the first option. On a re-run, keep a switch the profile already has.
 
 ## 4. Fill the files
 
 - Replace every `{{KEY}}` in `.claude/` with its value, using Edit (not in this skill's own folder, which keeps them for re-runs).
 - Rewrite each ADAPT block for this project, then remove its two marker comments: *architecture* (the plan template's Architecture checklist: keep the generic items that apply, name this project's layers, entry points and data stores, add the items its reviews will need), *layout* (`Explore`'s folder table), *machine* (the *This machine* lists), *external* and *ui-check* (`/write-plan`).
-- Write the values into `profile.md` (keys stay without braces), with the setup version from `.claude/orchestrator/VERSION` and today's date.
+- Write the values into `profile.md` (keys stay without braces) and the owner's answer into *Switches* (`- **Parallel stages:** on` or `off`), with the setup version from `.claude/orchestrator/VERSION` and today's date.
 - Verify: Grep `\{\{[A-Z_]+\}\}|ADAPT:` under `.claude/` finds nothing outside `orchestrator/claude-md-sections.md` and `orchestrator-init/`.
 
 ## 5. The gate
