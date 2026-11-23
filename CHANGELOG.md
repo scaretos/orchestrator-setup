@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+- `/orchestrator-init` sets up the language server (new step 8). For each main language it finds the plugin in the official marketplace whose `lspServers` serves the language's extensions, checks whether the plugin is installed and its server binary is on PATH, and asks once with the exact commands. It installs what the owner approves: the plugin at project scope by default (recorded in `.claude/settings.json`), the binary with a user-level installer. Commands that need `sudo` or an elevated shell are left to the owner. After `/reload-plugins` it checks that `findReferences` agrees with a Grep.
+- New profile key `LSP_SETUP`: the plugin, binary and install command per language, written into the *Reading rules* of `CLAUDE.md` so an agent whose server is missing names the fix.
+- Agents that find callers by Grep instead of `findReferences` say so in their report.
+
 ## 1.3.0
 
 - Stages are grouped by concern, then by the files they touch, and sized by what the agent must read; the 6-file cap is gone.

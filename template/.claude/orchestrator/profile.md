@@ -25,5 +25,6 @@ The project-specific values `/orchestrator-init` filled into the skills and agen
 | EXTERNAL_SYSTEMS | | `/write-plan` step 4: systems whose behaviour must be measured, not assumed |
 | UI_CHECK | | `/write-plan` *UI check*: how to see a UI change without a person |
 | LAYERS | | plan template *Architecture*: the project's layers and what each may do |
+| LSP_SETUP | | *Reading rules* in `CLAUDE.md`: per main language the LSP plugin, its server binary and how to install it |
 | MACHINE_TRAPS | | implementer, reviewer *This machine*: environment traps |
 | LAYOUT_ROWS | | `Explore` *Where things are* |

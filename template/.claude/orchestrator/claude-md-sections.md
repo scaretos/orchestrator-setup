@@ -42,7 +42,8 @@ No new tests for plumbing, getters and setters, each error branch, a second path
 ## Reading rules
 
 - Locate before you read: Grep (scoped to a folder, never the repository root, which can hold full worktree copies under `.claude/worktrees/`), or LSP `documentSymbol` for a file's members.
-- Every use of a known symbol before a rename, removal or signature change: LSP `findReferences` where available; otherwise Grep every naming variant.
+- Every use of a known symbol before a rename, removal or signature change: LSP `findReferences` where available; otherwise Grep every naming variant, and say in your report that the callers came from Grep: it misses calls through interfaces, aliases and re-exports.
+- Language server: {{LSP_SETUP}}. When `LSP` calls fail with a missing server or executable, name that install to the owner instead of retrying.
 - Files you will edit: read whole, early, once. Large files: read only the ranges you edit.
 - Files you need one fact from: read only the range the search hit points at.
 - Never re-read a range already in your context; trust your own edits.

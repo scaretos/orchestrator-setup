@@ -95,6 +95,24 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("$ARGUMENTS", skill)
         self.assertIn("{{PLANS_DIR}}/restructure-docs/<date>/audit.md", skill)
 
+    def test_orchestrator_init_steps_and_references(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "orchestrator-init", "SKILL.md"))
+        steps = [int(n) for n in re.findall(r"^## (\d+)\. ", skill, re.M)]
+        self.assertEqual(steps, list(range(1, len(steps) + 1)), "steps numbered in order")
+        for ref in re.findall(r"\b[Ss]tep (\d+)\b", skill):
+            with self.subTest(ref=ref):
+                self.assertIn(int(ref), steps, "a step reference points at no step")
+
+    def test_orchestrator_init_installs_the_language_server_only_with_approval(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "orchestrator-init", "SKILL.md"))
+        section = re.search(r"^## \d+\. Language server\n(.*?)^## ", skill, re.M | re.S)
+        self.assertIsNotNone(section)
+        body = section.group(1)
+        self.assertIn("AskUserQuestion", body)
+        self.assertIn("--scope project", body)
+        self.assertIn("/reload-plugins", body)
+        self.assertIn("findReferences", body)
+
     def test_restructure_docs_script_calls_use_the_profile_python(self):
         skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
         calls = re.findall(r"^\s*(\S+) \.claude/skills/restructure-docs/\w+\.py", skill, re.M)
