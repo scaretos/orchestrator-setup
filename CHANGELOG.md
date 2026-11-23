@@ -22,6 +22,7 @@
 - README and `docs/how-it-works.md` describe the new skill.
 - Stages are grouped by concern, then by the files they touch, and sized by what the agent must read; the 6-file cap is gone.
 - The plan reviewer looks up the callers of every member the plan changes; one that no stage covers is a Must fix.
+- `/workflow-review` counts escaped defects (later fixes to code a run built, with the check that missed each); a change that cut cost while they rose counts as regressed. The execution log records changed files per stage and the finish date for this.
 
 ## 1.1.0
 

@@ -6,8 +6,8 @@ Units are the relative cost units of `analyze.py` (input tokens of the strongest
 
 ## Reviews
 
-| date | runs reviewed | total units | units per stage | main finding |
-|---|---|---:|---:|---|
+| date | runs reviewed | total units | units per stage | escaped defects | main finding |
+|---|---|---:|---:|---:|---|
 
 ## Changes
 
@@ -18,7 +18,7 @@ Units are the relative cost units of `analyze.py` (input tokens of the strongest
 - Baseline: <metric> = <value>
 - Expected: <metric> → <value>
 - Verify: <how the next review measures it>
-- Result: <filled by the next review: confirmed | no effect | regressed, with the numbers>
+- Result: <filled by the next review: confirmed | no effect | regressed, with the numbers and the escaped defects since>
 -->
 
 ## Rejected
