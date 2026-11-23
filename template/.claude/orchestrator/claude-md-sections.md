@@ -15,7 +15,7 @@ Context loads by itself as you work; do not go looking for a guide.
 
 ## Planning work
 
-- At most 3 stages (about 15 files) and nothing external to measure: plan and build in one session, run the gate, done. Agents cost more than they save on work that small: each starts cold and reads its share again.
+- At most 3 stages and nothing external to measure: plan and build in one session, run the gate, done. Agents cost more than they save on work that small: each starts cold and reads its share again.
 - Larger work: `/write-plan <feature>`, read the plan, then `/execute-plan <plan path>` in a new session.
 
 ## The gate

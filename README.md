@@ -33,7 +33,7 @@ In a large codebase, one session can't hold a whole feature well:
 | **Every stage reviewed** | A fresh Opus reviewer per stage: plan fidelity, edge cases, tests that would actually fail if the code were wrong. Must fix items go back to the same implementer until the stage passes; a final review checks the seams between stages and runs the full verification. |
 | **Stop instead of guessing** | An implementer that hits an ambiguity, or a choice others would notice, reports BLOCKED. The orchestrator answers from the plan or asks you. |
 | **Mistakes found early** | A plan review before any code exists, a planner self-check built from every defect reviewers had to catch before, and checks that run in the stage that produces the behaviour. |
-| **Small, fresh contexts** | One stage ≈ one concern ≈ at most 6 files, each in its own agent. The orchestrator works from short reports and never reads code, so it stays small for the whole build. |
+| **Small, fresh contexts** | One stage = one concern, grouped so no two stages read the same files, each in its own agent. The orchestrator works from short reports and never reads code, so it stays small for the whole build. |
 | **Tests from independent sources** | New tests only when they check against something other than the code itself: a real system, your decision, a fixed bug. They're written before the code, from the plan. |
 | **It learns** | `/retro` turns what each build taught into path-scoped rules. `/workflow-review` measures the workflow from transcripts and proposes changes, tracked in a ledger. |
 
@@ -117,7 +117,7 @@ If the project already has long documentation that agents have to find and read 
 
 | Command | When |
 |---|---|
-| `/write-plan <feature>` | Anything bigger than ~3 stages / ~15 files, or anything that depends on an external system's behaviour. Read the plan it writes. |
+| `/write-plan <feature>` | Anything bigger than ~3 stages, or anything that depends on an external system's behaviour. Read the plan it writes. |
 | `/execute-plan <plan path>` | In a **new** session. Resumable: rerun it after an interruption, a usage limit or a new milestone. |
 | `/retro` | At the end of any piece of work (the orchestrator runs it itself). Proposes rule updates; writes nothing without your OK. |
 | `/workflow-review [runs]` | Every 2–3 executions. Measures and proposes workflow changes; writes nothing without your OK. |

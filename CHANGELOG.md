@@ -20,6 +20,7 @@
 - Rule loading is checked twice: simulated by `check_rules.py`, and for real by a fresh `Explore` agent that reads the probe files. The approval boundary lets narrowing a glob or splitting a rule with unchanged probe coverage go ahead without a new approval. The independent Opus reviewer is read-only, and the tree is checked to be unchanged after it runs.
 - `/orchestrator-init` now detects hand-read documentation and points the owner at `/restructure-docs` after the first setup; it never runs it.
 - README and `docs/how-it-works.md` describe the new skill.
+- Stages are grouped by concern, then by the files they touch, and sized by what the agent must read; the 6-file cap is gone.
 
 ## 1.1.0
 

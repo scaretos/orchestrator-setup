@@ -31,7 +31,7 @@ The planner runs in your main session, because it needs you: every decision with
 - **Open decisions** (`### O1 …`): what can only be known after measuring or building something, with the stage that decides it, the criteria and what each answer leads to. *Why:* a guess written as a decision gives an implementer confidence it shouldn't have.
 - **Measured facts:** behaviour of external systems, measured now with a probe. *Why:* "the API returns X" is the most common wrong assumption, and every stage built on it inherits the error.
 - **Contracts:** exact signatures and shapes between stages, including error and empty cases.
-- **Stages,** each one concern of about 6 files at most, with the decisions it uses, the line ranges to read first, the tests to write before the code (inputs, expected result, source), edge cases, acceptance criteria and a verify command.
+- **Stages,** each one concern, with the decisions it uses, the line ranges to read first, the tests to write before the code (inputs, expected result, source), edge cases, acceptance criteria and a verify command. Concerns that touch the same files share a stage. *Why:* a file read by two stages is paid for twice, and a file count says little about the work: a one-line change in twelve files is a small stage, two files the agent must understand in full can be a large one.
 
 ### Why the plan's layout matters
 
