@@ -32,8 +32,8 @@ In a large codebase, one session can't hold a whole feature well:
 | **The right model for each stage** | Sonnet for stages the plan fully specifies, Opus for stages that still need reasoning. The plan reviewer flags any Sonnet stage with a choice left in it. |
 | **Every stage reviewed** | A fresh Opus reviewer per stage: plan fidelity, edge cases, tests that would actually fail if the code were wrong. Must fix items go back to the same implementer until the stage passes; a final review checks the seams between stages and runs the full verification. |
 | **Stop instead of guessing** | An implementer that hits an ambiguity, or a choice others would notice, reports BLOCKED. The orchestrator answers from the plan or asks you. |
-| **Mistakes found early** | A plan review before any code exists, a planner self-check built from every defect reviewers had to catch before, and checks that run in the stage that produces the behaviour. |
-| **Small, fresh contexts** | One stage ≈ one concern ≈ at most 6 files, each in its own agent. The orchestrator works from short reports and never reads code, so it stays small for the whole build. |
+| **Mistakes found early** | A plan review that checks the plan's claims and the callers it touches against the code before anything is built, a planner self-check built from every defect reviewers had to catch before, and checks that run in the stage that produces the behaviour. |
+| **Small, fresh contexts** | One stage = one concern, grouped so no two stages read the same files, each in its own agent. The orchestrator works from short reports and never reads code, so it stays small for the whole build. |
 | **Tests from independent sources** | New tests only when they check against something other than the code itself: a real system, your decision, a fixed bug. They're written before the code, from the plan. |
 | **It learns** | `/retro` turns what each build taught into path-scoped rules. `/workflow-review` measures the workflow from transcripts and proposes changes, tracked in a ledger. |
 
@@ -117,7 +117,7 @@ If the project already has long documentation that agents have to find and read 
 
 | Command | When |
 |---|---|
-| `/write-plan <feature>` | Anything bigger than ~3 stages / ~15 files, or anything that depends on an external system's behaviour. Read the plan it writes. |
+| `/write-plan <feature>` | Anything bigger than ~3 stages, or anything that depends on an external system's behaviour. Read the plan it writes. |
 | `/execute-plan <plan path>` | In a **new** session. Resumable: rerun it after an interruption, a usage limit or a new milestone. |
 | `/retro` | At the end of any piece of work (the orchestrator runs it itself). Proposes rule updates; writes nothing without your OK. |
 | `/workflow-review [runs]` | Every 2–3 executions. Measures and proposes workflow changes; writes nothing without your OK. |
@@ -133,11 +133,11 @@ There are two loops, and they improve different things:
 2. **How the workflow works**, through `/workflow-review`. It is the procedure from the session that produced most of this setup's rules, turned into a skill:
    - `analyze.py runs` finds the planning and execution sessions of recent plans in your transcripts (worktree sessions included).
    - `analyze.py metrics` measures every agent: turns, relative cost and API-equivalent dollars, peak context, cold cache rewrites and the idle gaps behind them, review rounds and verdicts, duplicate reads, rule files loaded, tool errors.
-   - One Sonnet `workflow-analyst` per run digs into the expensive parts with `analyze.py timeline` (never by reading raw transcripts) and returns referenced evidence, measured kept separate from estimated.
+   - One Sonnet `workflow-analyst` per run digs into the expensive parts with `analyze.py timeline` (never by reading raw transcripts) and returns referenced evidence, measured kept separate from estimated. It also counts **escaped defects**: fixes made since the run finished to code it built, each with the check that missed it.
    - The main session consolidates the evidence into ranked proposals. Each one comes with an exact diff, the expected saving, the quality risk and the metric the next review uses to check it.
    - You pick which to apply. Each one, and each rejection with your reason, goes into `.claude/orchestrator/ledger.md`. The next review checks whether adopted changes delivered and doesn't re-propose rejected ideas without new evidence.
 
-The hard rule in both loops: **never trade correctness for tokens.** A proposal to drop a review or a test needs evidence that it caught nothing over several runs *and* that a cheaper check covers the same failure.
+The hard rule in both loops: **never trade correctness for tokens.** A proposal to drop a review or a test needs evidence that it caught nothing over several runs *and* that a cheaper check covers the same failure. An adopted change that cut cost while escaped defects rose counts as regressed.
 
 ## What gets installed
 

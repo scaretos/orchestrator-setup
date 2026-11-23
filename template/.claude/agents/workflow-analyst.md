@@ -19,6 +19,7 @@ The plan path, the session ids, a metrics file (made by `analyze.py metrics`), t
 - Subagent transcripts are `<session dir>/subagents/agent-*.jsonl`; each `.meta.json` beside it names the agent type and its task. `analyze.py metrics --json` prints every field, including the agent's file name.
 - Read the plan's *Execution log* and the handoff notes (`handoffs/` beside the plan): they say what each stage was meant to do, its rounds, deviations and *Learned* lines.
 - Dig where the cost is: the agents with the most units, every cold rewrite (what was the gap: a long command, a review wait, a user pause?), every round after the first (what did the reviewer find, and was it a plan defect, an instruction gap, the environment or the model?), every tool error, every duplicate read.
+- Escaped defects, per run asked about: `git log --oneline --since=<the log's finish date> origin/{{DEFAULT_BRANCH}} -- <the log's changed files>`. For each commit that may fix behaviour the run built, read its diff at those files only. A confirmed one gets the stage that built it and the check that should have caught it: the plan, the stage's tests, its review or the final review. Judged from the subject alone, it is estimated.
 - For a finding, compute its cost from the metrics (tokens × the weights in `analyze.py`'s header), and say whether that is measured or estimated.
 - Send independent calls together in one message. Stop when the questions are answered.
 
@@ -28,6 +29,7 @@ The plan path, the session ids, a metrics file (made by `analyze.py metrics`), t
 **Top cost drivers:** up to 5, each: agent, units, why it cost that much (turn refs).
 **Inefficiencies:** each: what happened | evidence (agent + turn range) | cost (measured/estimated) | root cause: plan defect / instruction gap / environment / model behaviour / user pause.
 **Quality events:** what each review or check caught; would a cheaper or earlier check (the planner's self-check, a test in the producing stage) have caught it?
+**Escaped defects:** per run: count; each: commit | stage | missed by | measured or estimated. "none found" with the date range searched.
 **Ledger checks:** for each ledger entry given, the metric now and whether the change shows its expected effect.
 **Candidate improvements:** each with the file it would change and the evidence behind it; leave ranking to the caller.
 **Unknowns:** what you could not measure, and why.

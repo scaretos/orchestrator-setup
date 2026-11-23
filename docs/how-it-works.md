@@ -31,7 +31,7 @@ The planner runs in your main session, because it needs you: every decision with
 - **Open decisions** (`### O1 …`): what can only be known after measuring or building something, with the stage that decides it, the criteria and what each answer leads to. *Why:* a guess written as a decision gives an implementer confidence it shouldn't have.
 - **Measured facts:** behaviour of external systems, measured now with a probe. *Why:* "the API returns X" is the most common wrong assumption, and every stage built on it inherits the error.
 - **Contracts:** exact signatures and shapes between stages, including error and empty cases.
-- **Stages,** each one concern of about 6 files at most, with the decisions it uses, the line ranges to read first, the tests to write before the code (inputs, expected result, source), edge cases, acceptance criteria and a verify command.
+- **Stages,** each one concern, with the decisions it uses, the line ranges to read first, the tests to write before the code (inputs, expected result, source), edge cases, acceptance criteria and a verify command. Concerns that touch the same files share a stage. *Why:* a file read by two stages is paid for twice, and a file count says little about the work: a one-line change in twelve files is a small stage, two files the agent must understand in full can be a large one.
 
 ### Why the plan's layout matters
 
@@ -43,7 +43,7 @@ Before the plan reviewer sees the plan, the planner runs a checklist. Every item
 
 ### The plan reviewer
 
-An Opus agent with no stake in the plan, told to assume it holds at least one wrong assumption. It verifies claims against the code, checks the design and the tags, and reports READY or REVISE with concrete replacement text. A follow-up round checks only the sections the planner changed, because every measured round-2 finding sat in changed sections.
+An Opus agent with no stake in the plan, told to assume it holds at least one wrong assumption. It verifies claims against the code, looks up the callers of every member the plan changes for ones no stage covers, checks the design and the tags, and reports READY or REVISE with concrete replacement text. A follow-up round checks only the sections the planner changed, because every measured round-2 finding sat in changed sections.
 
 ## The orchestrator: `/execute-plan`
 
@@ -100,8 +100,8 @@ Implementers end with a *Learned* line: a fact or trap that cost them searches o
 
 1. `analyze.py runs` lists sessions that ran `/write-plan` or `/execute-plan`, grouped by plan, across worktree transcript folders.
 2. `analyze.py metrics` measures every agent from its transcript: turns, units, token split, peak context, cold rewrites and the gaps behind them, rounds and verdicts, duplicate reads, rule files loaded, errors, and command classes (build, test, gate, polling).
-3. One Sonnet `workflow-analyst` per run investigates the expensive parts with `analyze.py timeline` and returns referenced evidence, never strategy.
-4. The main session consolidates the evidence into ranked proposals (exact diff, expected saving, quality risk, verify metric) and checks the ledger: did the last review's changes deliver, and was this idea already rejected?
+3. One Sonnet `workflow-analyst` per run investigates the expensive parts with `analyze.py timeline` and returns referenced evidence, never strategy. It also lists **escaped defects**: commits since the run finished that fix code it built (found by `git log` over the files the execution log lists), each with the check that should have caught it. *Why:* transcripts show what a review cost and what it caught, never what it missed; without this, every saving looks free.
+4. The main session consolidates the evidence into ranked proposals (exact diff, expected saving, quality risk, verify metric) and checks the ledger: did the last review's changes deliver without more escaped defects, and was this idea already rejected?
 5. You choose. Adopted changes and rejections both go into the ledger, so the next review starts from what is already known.
 
 Research runs on Sonnet because extracting evidence from transcripts needs care, not judgment. The judgment (what to change, and whether it risks quality) stays with the strongest model, which holds only the short reports.

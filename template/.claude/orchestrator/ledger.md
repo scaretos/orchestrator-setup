@@ -6,8 +6,8 @@ Units are the relative cost units of `analyze.py` (input tokens of the strongest
 
 ## Reviews
 
-| date | runs reviewed | total units | units per stage | main finding |
-|---|---|---:|---:|---|
+| date | runs reviewed | total units | units per stage | escaped defects | main finding |
+|---|---|---:|---:|---:|---|
 
 ## Changes
 
@@ -18,7 +18,7 @@ Units are the relative cost units of `analyze.py` (input tokens of the strongest
 - Baseline: <metric> = <value>
 - Expected: <metric> → <value>
 - Verify: <how the next review measures it>
-- Result: <filled by the next review: confirmed | no effect | regressed, with the numbers>
+- Result: <filled by the next review: confirmed | no effect | regressed, with the numbers and the escaped defects since>
 -->
 
 ## Rejected
@@ -48,4 +48,4 @@ Measured in the project this setup comes from, not in this one. Treat them as st
 - An owner conflict left as "to confirm" came back after the owner's first real look as a fix stage that reopened finished stages. Rule in `/write-plan` step 2.
 
 ### I5 Small work gets no agents
-- At most 3 stages (about 15 files) without external measurement: one session is cheaper than an orchestrator plus agents, which each start cold. Rule in `/write-plan` *First*.
+- At most 3 stages without external measurement: one session is cheaper than an orchestrator plus agents, which each start cold. Rule in `/write-plan` *First*.
