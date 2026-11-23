@@ -17,6 +17,7 @@ Spot-check with the tools CLAUDE.md's *Reading rules* name; read line ranges, no
 - Every command exists and runs as written in {{SHELL}} from the repository root: the gate, the test projects or packages and their filters, every check a stage names.
 - Every test declared in a stage's test files matches that stage's test filter; a second test class or `describe` block in the same file is the usual miss.
 - Search for existing code that already does what a stage plans to build. The plan must reuse or extend it.
+- For every member whose signature, visibility or behaviour the plan changes, find its callers (LSP `findReferences`, otherwise Grep every naming variant). A caller in no stage's files and not stated unaffected is a Must fix: the plan's picture of the code is incomplete.
 
 ## Check the design
 

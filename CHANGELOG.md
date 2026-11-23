@@ -21,6 +21,7 @@
 - `/orchestrator-init` now detects hand-read documentation and points the owner at `/restructure-docs` after the first setup; it never runs it.
 - README and `docs/how-it-works.md` describe the new skill.
 - Stages are grouped by concern, then by the files they touch, and sized by what the agent must read; the 6-file cap is gone.
+- The plan reviewer looks up the callers of every member the plan changes; one that no stage covers is a Must fix.
 
 ## 1.1.0
 

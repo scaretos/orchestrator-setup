@@ -65,6 +65,7 @@ If that one session is a fresh one, or runs in another repository, it starts as 
 ## Quality bar
 
 - Every file to create or change is named; every new public member has its signature.
+- Every caller of a member whose signature, visibility or behaviour changes is in a stage's *Files owned* or named as unaffected.
 - Every stage has acceptance criteria a reviewer can check and verification commands that exist, and each passes when the stage is done right (step 8).
 - Edge cases are listed per stage, not left for the implementer to discover.
 - Reuse is explicit: similar code is pointed to (`file:line`) with "reuse" or "extend".

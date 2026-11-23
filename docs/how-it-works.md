@@ -43,7 +43,7 @@ Before the plan reviewer sees the plan, the planner runs a checklist. Every item
 
 ### The plan reviewer
 
-An Opus agent with no stake in the plan, told to assume it holds at least one wrong assumption. It verifies claims against the code, checks the design and the tags, and reports READY or REVISE with concrete replacement text. A follow-up round checks only the sections the planner changed, because every measured round-2 finding sat in changed sections.
+An Opus agent with no stake in the plan, told to assume it holds at least one wrong assumption. It verifies claims against the code, looks up the callers of every member the plan changes for ones no stage covers, checks the design and the tags, and reports READY or REVISE with concrete replacement text. A follow-up round checks only the sections the planner changed, because every measured round-2 finding sat in changed sections.
 
 ## The orchestrator: `/execute-plan`
 
