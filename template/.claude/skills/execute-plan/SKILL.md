@@ -7,19 +7,22 @@ disable-model-invocation: true
 
 You are the orchestrator for the plan at: $ARGUMENTS
 
-You coordinate and decide. You do not implement, explore, or read source code, diffs or logs: work from the agents' short reports, and never ask an agent to return file contents. Your context is paid again on every turn, so keep it small. The reviewers are the review: do not add another. Run one agent at a time.
+You coordinate and decide. You do not implement, explore, or read source code, diffs or logs: work from the agents' short reports, and never ask an agent to return file contents. Your context is paid again on every turn, so keep it small. The reviewers are the review: do not add another. Run one stage at a time, except the members of a parallel group the plan names (see *Parallel groups*).
 
 ## Setup
 
-1. Read the plan's header, Decisions, stage list and Execution log (Grep `^##` in the plan with line numbers to locate sections). The handoff directory is `handoffs/` beside the plan.
+1. Read the plan's header, Decisions, Parallel groups, stage list and Execution log (Grep `^##` in the plan with line numbers to locate sections). The handoff directory is `handoffs/` beside the plan.
 2. **Resume:** if the log records a worktree, enter it (`EnterWorktree` with `path`) and run `git status --porcelain`. Skip steps 3 to 5.
    - Clean: continue after the last committed stage.
+   - The log records a parallel group that is not merged yet: check each member's worktree (`git -C <path> status --porcelain`, and whether its branch has a commit after the group base). Committed: it waits for the merge. Clean without a commit: spawn its implementer again. Not clean: ask the user, as below. Then continue at step 5 of *Parallel groups*.
    - Not clean: the next stage was interrupted. Never discard or redo it on your own; ask the user. Either continue it: spawn `stage-implementer` for that stage and add "The working tree holds this stage's unfinished changes. Read `git diff` and `git status`, check what is done against the stage's steps, and continue from there; do not start over." Or discard the changes, only on the user's word.
 3. **Drift check:** `git fetch origin`, then `git diff --stat <plan base> origin/{{DEFAULT_BRANCH}} -- <every file the plan names>`. If a planned file changed, stop and show the user which: a stale plan produces confident wrong code. No remote (`git remote` prints nothing): compare with the local `{{DEFAULT_BRANCH}}` instead, here and in step 4, and skip every push and PR below; the branch stays local and the report says so.
 4. **Worktree:** `EnterWorktree` with name `<feature-slug>` (a fresh branch from `origin/{{DEFAULT_BRANCH}}`). Prepare it before any agent opens a source file: `{{WORKTREE_PREP}}`. A language server that starts on an unprepared tree reports missing packages for the whole session. Record worktree path, branch and start commit in the log.
 5. If the working tree is not clean, stop and ask the user.
 
 ## For each stage, in the order listed
+
+The members of a parallel group go through these steps at the same time; *Parallel groups* says what changes for them.
 
 1. **Base:** record `git rev-parse HEAD`.
 2. **Implement:** spawn `stage-implementer` with plan path, stage id, handoff directory. `Model: sonnet` → pass `model: sonnet`. `Model: opus` → pass `effort: high`. Do not restate the plan; add only decisions made during execution.
@@ -36,6 +39,19 @@ You coordinate and decide. You do not implement, explore, or read source code, d
 6. **Commit:** `git add -- <the implementer's Changed files>`. Then `git status --porcelain`: anything else modified or untracked stays unstaged and goes into your final report. Write the message to a file in the scratch directory and `git commit -F <file>` (quoted multi-line `-m` messages break in some shells). Subject `<feature-slug>: <stage id> <stage name>`; end the body with the session's attribution line, if any.
 7. **Log:** stage id, commit, model, review rounds, the Changed files (`/workflow-review` later looks for fixes to them), deviations from the handoff note, the implementer's *Learned* line and the reviewer's *Rules out of date*. If the stage decided an open decision, move it into the plan's Decisions under its id (`O1` → `D…`, with the reason), so later stages read it like any other decision.
 8. **Owner check:** if the stage has an *Owner check*, ask the user with `AskUserQuestion` to try it in the real product (what to open, what to look at, the decision it confirms) before the next stage starts. Feedback that changes a decision: write it into Decisions (a new `D<n>`, source "owner, execution"), send it to the same implementer via `SendMessage`, review and commit as in steps 4 to 6 (subject `<stage id> owner check`). Feedback found here costs one stage's fix; found after the last stage, it reopens every stage built on it. If the answer takes more than an hour, see *Pauses*.
+
+## Parallel groups
+
+The plan proved each group's members independent: different files, no shared code, separate runtime (its *Parallel groups* section). You run them; you never resolve a clash between them. Each member works in its own worktree, so a half-finished edit in one never breaks another's build or tests, and a reviewer's diff shows only its stage. When the stages before the group are committed:
+
+1. **Base:** record `git rev-parse HEAD` as the group base; it is every member's base commit.
+2. **Worktrees:** the group's first member works in the feature worktree. For each other member, from the feature worktree root: `git worktree add -b <branch>-<stage id> ../<feature-slug>-<stage id> <group base>` (stage id in lower case), then `{{WORKTREE_PREP}}` inside the new worktree. Log each worktree's absolute path and branch.
+3. **Implement:** spawn every member's `stage-implementer` in one message, each as in step 2 of *For each stage*, adding: "Parallel group P<n>. Your work tree is `<absolute path>`." Members then go through that section's steps 3 to 7 on their own as their notifications arrive; answer a BLOCKED one while the others run.
+4. **Per member, in its work tree:** give its `stage-reviewer` the work tree path with the base commit; a `tests` stage's verify command runs in that tree; commit there (`git -C <path> add -- <files>`, `git -C <path> commit -F <file>`). Before the commit, compare the implementer's Changed files with the member's files under *Files per member*: a file outside that list is one another member may change too. Do not commit it; stop that member and ask the user.
+5. **Merge:** when every member is committed, in the feature worktree run `git cherry-pick <commit>` for each member after the first, in the group's merge order. The files are disjoint, so each applies cleanly. A conflict means the plan's independence was wrong: `git cherry-pick --abort`, keep the worktrees, stop and show the user the files. Never resolve it yourself.
+6. **Group check:** in the feature worktree, run every member's verify command, in the foreground with a long timeout, output cut to its last lines. All pass: remove the extra worktrees and their branches (`git worktree remove <path>`, `git branch -D <branch>`) and log the merged commits and the check. A failure is an interaction the plan missed: keep the worktrees, stop and show the user the failing lines, and log it as a planning miss for `/workflow-review`.
+
+Then continue with the stage after the group. A group has no *Owner check* and owns no open decision (the plan keeps those out), so nothing waits on the owner inside it.
 
 ## Milestone end
 

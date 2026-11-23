@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+- Parallel groups: stages that provably don't touch each other's work run at the same time, each in its own worktree.
+  - `/write-plan` has a new step 7 (the steps after it move up by one). A group needs every one of these: no dependency between members; disjoint files, counting test files, fixtures, *Same piece of work* files and side-effect files (lockfiles, generated code, snapshots, migrations and their numbering, registrations, index and project files); no member calls, extends, tests or reads code another changes; verify commands that can run at the same time; no open decision or owner check inside the group; each member a full implement-and-review cycle, at most 3 per group. A clean concern is never split or merged to make a group.
+  - The plan template has a *Parallel groups* section with the evidence per group (files per member, code between members, runtime, merge order). The self-check checks each group by Grep, and a review fix that touches a member means the whole group is checked again.
+  - `plan-reviewer` verifies every claim of a group against the plan and the code. It also looks for side-effect files the section does not list. Anything it cannot prove is a Must fix.
+  - `/execute-plan` runs the first member in the feature worktree and gives each other member a worktree at the group base, prepared with `WORKTREE_PREP`. It refuses to commit a file outside a member's list, cherry-picks the members in merge order, and runs every member's verify on the merged tree. A conflict or a failing group check stops the run for the owner and is logged as a planning miss. The resume step handles a group that was interrupted.
+  - `stage-implementer` and `stage-reviewer` work in the work tree they are given. A parallel member that needs a file outside its list reports BLOCKED.
+  - `workflow-analyst` reports the time groups saved, what they cost, and every group failure as a plan defect.
+
 ## 1.4.0
 
 - `/orchestrator-init` sets up the language server (new step 8). For each main language it finds the plugin in the official marketplace whose `lspServers` serves the language's extensions, checks whether the plugin is installed and its server binary is on PATH, and asks once with the exact commands. It installs what the owner approves: the plugin at project scope by default (recorded in `.claude/settings.json`), the binary with a user-level installer. Commands that need `sudo` or an elevated shell are left to the owner. After `/reload-plugins` it checks that `findReferences` agrees with a Grep.
