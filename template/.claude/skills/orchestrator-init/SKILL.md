@@ -1,6 +1,6 @@
 ---
 name: orchestrator-init
-description: Adapt the installed plan-and-execute orchestrator setup to this project. Detects build, test, shell and layout, fills every {{PLACEHOLDER}} and ADAPT block in .claude/, merges the CLAUDE.md sections, creates a gate script if there is none, and wires settings with the owner's OK. Run once after installing, and again after upgrading the setup or changing .claude/orchestrator/profile.md.
+description: Adapt the installed plan-and-execute orchestrator setup to this project. Detects build, test, shell and layout, fills every {{PLACEHOLDER}} and ADAPT block in .claude/, merges the CLAUDE.md sections, creates a gate script if there is none, wires settings and installs the language server plugin and binary for the main languages with the owner's OK. Run once after installing, and again after upgrading the setup or changing .claude/orchestrator/profile.md.
 disable-model-invocation: true
 ---
 
@@ -18,8 +18,12 @@ One parallel batch of Glob, Read (small files, or ranges) and short read-only co
 - **Stack and commands:** build files at the root and one level down (`package.json`, `*.sln`/`*.csproj`, `Cargo.toml`, `go.mod`, `pyproject.toml`/`setup.cfg`, `pom.xml`, `build.gradle*`, `Makefile`, `CMakeLists.txt`), and CI workflows (`.github/workflows/*`, `.gitlab-ci.yml`, `azure-pipelines.yml`): CI usually holds the project's true build and test commands. Find the test framework and its filter syntax (`--filter`, `-k`, `-t`, `--grep`, `-run`).
 - **Environment:** OS and shell (Windows PowerShell 5.1, PowerShell 7, bash, zsh), Python 3 command (`python3 --version`, `python --version`, `py -3 --version`), Node (`node --version`, for the optional hook), `git remote -v` and `git symbolic-ref refs/remotes/origin/HEAD` (default branch; with no remote, the current branch), the remote's host and whether `gh` (or `glab`) is installed, `git config core.autocrlf`. No remote is fine: `/execute-plan` then works on local branches and skips pushes and PRs; set `PR_CMD` to "none (no remote)" and say so in the report.
 - **Layout:** the top-level folders and what each holds (one line each), build output folders, existing folder `CLAUDE.md` files.
-- **Documentation:** the root `CLAUDE.md` and any other guides agents are told to read (`*-CLAUDE.md`, `*-GUIDE.md`, `docs/`), with their sizes, and whether the repository already has `.claude/rules/`. Step 9 uses this for the `/restructure-docs` hint; do not restructure anything here.
-- **Language tooling:** whether a language server is active: an `LSP` tool in your own tool list means a plugin is installed; call its `documentSymbol` on one source file to see that it serves this language. The agents use `findReferences` and fall back to Grep without one; if none is active, name the Claude Code LSP plugin for the main language in the report.
+- **Documentation:** the root `CLAUDE.md` and any other guides agents are told to read (`*-CLAUDE.md`, `*-GUIDE.md`, `docs/`), with their sizes, and whether the repository already has `.claude/rules/`. Step 10 uses this for the `/restructure-docs` hint; do not restructure anything here.
+- **Language tooling:** the languages that hold most of the source (`git ls-files`, counted by extension), and for each of them:
+  - *Served now?* An `LSP` tool in your own tool list means some language server is active; call its `documentSymbol` on one source file of that language.
+  - *Its plugin:* in the official marketplace's clone, `~/.claude/plugins/marketplaces/claude-plugins-official/.claude-plugin/marketplace.json`, the entry whose `lspServers` lists the extension under `extensionToLanguage`. Its `command` is the server binary, and the plugin's `README.md` next to it has the binary's install commands. Take an entry that declares `lspServers`: a same-named plugin from another marketplace can install without any server. No clone means the marketplace is not added: step 8 asks about that.
+  - *Installed?* `claude plugin list --json` holds the plugin id with `enabled: true`, at scope `user`, or at scope `project` or `local` with this repository as `projectPath`.
+  - *Binary on PATH?* `command -v <command>` (bash) or `Get-Command <command>` (PowerShell), and which package managers from the README are installed (`npm`, `pipx`/`pip`, `dotnet`, `go`, `rustup`, `gem`, `brew`, `winget`).
 
 In a large monorepo, one `Explore` call with concrete questions (packages, their test commands, shared libraries) is cheaper than many reads.
 
@@ -34,6 +38,7 @@ Fill every key of the profile table. Rules:
 - **`EXTERNAL_SYSTEMS`:** systems whose behaviour the code does not show and plans must measure (a third-party application, a database engine, a payment API, a browser engine). None: write "none so far" and simplify step 4 of `/write-plan` to the probe rule only.
 - **`UI_CHECK`:** how a UI change is seen without a person (a screenshot or render command, a storybook, visual tests). None: "none: the owner check decides".
 - **`LAYERS`:** the project's real layers and what each may and may not do, in one line.
+- **`LSP_SETUP`:** per main language, the plugin, the binary it starts and the binary's install command for this OS, e.g. "`pyright-lsp` (project settings) starts `pyright-langserver`: `npm install -g pyright`, then `/reload-plugins`". It tells an agent whose `LSP` calls fail what to ask the owner for. No plugin for the language: "none: Grep only".
 - **`MACHINE_TRAPS`:** known environment traps (locked files while the app runs, services that must be up, slow commands and their real duration, localised tool output). None known: one line "none known yet: `/retro` adds them as they turn up".
 
 Show the owner the filled table in one message and ask with one `AskUserQuestion` (at most 4 questions) only about what detection could not settle: usually the gate's contents if there is no CI, the external systems, the UI check. Offer your detected value as the first, recommended option.
@@ -59,12 +64,23 @@ Merge the sections of `.claude/orchestrator/claude-md-sections.md` (placeholders
 
 Show the owner `.claude/orchestrator/settings.snippet.json` merged into their `.claude/settings.json` (without the `//` notes, deny list cut to the build folders this project has, the hook only if checkouts use CRLF and Node is installed) as a diff, with each part's reason from its note. Write only the parts they approve.
 
-## 8. Starter rules
+## 8. Language server
+
+`findReferences` finds every caller of a member, including those a text search misses or mistakes (a call through an interface, an alias or re-export, an overload or a same-named member elsewhere). Without a server the agents fall back to Grep. So for each main language without a working server (on a re-run, check the parts `LSP_SETUP` names again first):
+
+1. **Ask once.** One `AskUserQuestion`, one question per missing part, each option with the exact command:
+   - *Marketplace* (no clone): add it (`claude plugin marketplace add anthropics/claude-plugins-official`), or skip.
+   - *Plugin:* project scope, recommended (`claude plugin install <plugin>@claude-plugins-official --scope project`: it is recorded under `enabledPlugins` in `.claude/settings.json`, so everyone who opens the repository is offered it), user scope (`--scope user`: this machine, every project), or skip.
+   - *Binary:* run the README's install command, the owner installs it, or skip. Prefer a user-level installer (`npm -g`, `pipx`, `dotnet tool --global`, `go install`, `rustup component add`) over a system one. A command that needs `sudo` or an elevated shell is the owner's to run, typed with `!`. A missing toolchain (no `npm`, no .NET SDK) is not installed here: name it in the report.
+2. **Install** what was approved, in the foreground, then check the binary again. A tool installed just now may not be on this shell's PATH yet: find it in the installer's folder (`npm prefix -g`, `~/.dotnet/tools`, `$(go env GOPATH)/bin`) and say in the report that Claude Code needs a new shell to see it.
+3. **Activate and check.** Plugins load when a session starts: ask the owner to type `/reload-plugins`, or to restart Claude Code in this folder if the binary only just reached PATH. The server must start on a buildable tree: one started before dependencies are restored reports missing packages for the whole session, so run `WORKTREE_PREP` first in a checkout that was never built. Then call `documentSymbol` on one source file, and `findReferences` on one member that Grep shows called from another file; the results must agree. The first calls after a start can fail with "server is starting": retry once after a few seconds. If the `LSP` tool only appears after a restart, leave this check to the owner and say so in the report.
+
+## 9. Starter rules
 
 Propose at most 3 `.claude/rules/<topic>.md` files for the areas where detection showed traps or the most complex code, each with `paths:` frontmatter and a few lines of facts that are not obvious from the code. Check every `paths:` glob hits files (`git ls-files`). Write only those the owner approves; `/retro` grows them from real work.
 
-## 9. Report
+## 10. Report
 
-The profile table, the files changed, the gate result, what was left for the owner (settings parts declined, a missing LSP plugin, a gate failure). Then how to start: a small change needs no workflow; for a larger one, `/write-plan <feature>`, read the plan, `/execute-plan <plan>` in a new session; after 2–3 executions, `/workflow-review`. Suggest committing `.claude/` and `CLAUDE.md` on a branch.
+The profile table, the files changed, the gate result, the language server per main language (working, installed but not yet checked, or skipped, with the command that remains), and what else was left for the owner (settings parts declined, a gate failure). Then how to start: a small change needs no workflow; for a larger one, `/write-plan <feature>`, read the plan, `/execute-plan <plan>` in a new session; after 2–3 executions, `/workflow-review`. Suggest committing `.claude/` and `CLAUDE.md` on a branch.
 
 If detection found substantial documentation that agents must find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, or a `docs/` folder the instructions point at), add one hint: `/restructure-docs` audits the Claude Code context against implementation, tests, build configuration, CI and explicit owner decisions. It corrects, consolidates and restructures the context into a lean root `CLAUDE.md`, folder `CLAUDE.md` files and path-scoped `.claude/rules/`. It moves procedures into skills, including checklists for recurring kinds of change, and proposes hooks or deny rules where an instruction should be enforced. It is owner-invoked only and changes nothing without the owner's approval; do not run it yourself. Say how many guides and bytes it would cover.

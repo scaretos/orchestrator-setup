@@ -94,7 +94,7 @@ The workflow keeps these numbers down because it keeps every context small: in i
 
 ## Quick start
 
-Requirements: Claude Code with skills and subagents, git, Python 3 (for `/workflow-review` and `/restructure-docs`). Optional: Node (CRLF guard hook), `gh` (draft PRs), an LSP plugin for your language (exact `findReferences`).
+Requirements: Claude Code with skills and subagents, git, Python 3 (for `/workflow-review` and `/restructure-docs`). Optional: Node (CRLF guard hook), `gh` (draft PRs). `/orchestrator-init` offers the language server for your main languages (exact `findReferences`).
 
 ```bash
 git clone https://github.com/scaretos/orchestrator-setup.git
@@ -109,7 +109,7 @@ Then, in Claude Code inside your project:
 /orchestrator-init
 ```
 
-It detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). Commit the result on a branch.
+It detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). For each main language without a working language server it offers the official Claude Code LSP plugin (at project scope, so it is recorded in `.claude/settings.json` for everyone who clones) and the server binary the plugin starts, which is a separate install; then it checks that `findReferences` agrees with a text search. Commit the result on a branch.
 
 If the project already has long documentation that agents have to find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, a `docs/` folder the instructions point at), `/orchestrator-init` will point you at `/restructure-docs`. It checks every instruction against the implementation, tests, build configuration and CI, and against explicit owner decisions. It corrects or removes what the evidence contradicts, reports disagreements, and adds only high-value missing knowledge. The result is a lean root `CLAUDE.md`, folder `CLAUDE.md` files where they earn their place, and path-scoped `.claude/rules/`. Procedures move into skills, including a checklist for each kind of change your git history shows recurring. Instructions that should be enforced come back as hook or deny-rule proposals. It changes nothing before you approve the audit, and it never touches settings, hooks, `CLAUDE.local.md` or human documentation.
 
