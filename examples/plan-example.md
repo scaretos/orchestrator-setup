@@ -58,6 +58,9 @@ export const CSV_BOM = "﻿";
 ## Verification (whole feature)
 - `bash scripts/gate.sh` (the final reviewer runs it)
 
+## Parallel groups
+none (S2 builds on S1's writer, S3 on S2's route)
+
 ## Stages
 
 ### S1: CSV writer

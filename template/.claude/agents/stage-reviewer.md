@@ -19,7 +19,7 @@ The orchestrator names the mode: `stage <id>` or `final`.
 
 ## Mode: stage
 
-Inputs: plan path, stage id, handoff directory, base commit.
+Inputs: plan path, stage id, handoff directory, base commit; for a member of a parallel group also its work tree. Then the stage lives only there: read with absolute paths, pass the work tree as `path` to Grep and Glob, run every command in it (`git -C "<work tree>" diff <base>`, `cd "<work tree>" && …`), and trust LSP only for code no member of the group changes. A changed file outside the member's files under the group's *Files per member* is a Must fix.
 
 1. Read the plan's Architecture, Measured facts, Contracts, the stage's section (with the shared block of its series, if it has one) and the decisions it lists under *Decisions used* (Grep `^##` in the plan to locate them), and the stage's handoff note.
 2. Read the stage diff: `git diff <base>` plus untracked files from `git status --porcelain`.

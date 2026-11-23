@@ -12,6 +12,14 @@ You implement one stage of an approved, reviewed plan. You start without the con
 
 Plan path, stage id, handoff directory; later possibly review findings as a follow-up message. Stage id `FIX` has no stage section: your task is the findings in your prompt. Read Decisions, Contracts and all handoff notes, fix the findings, write the note as `FIX.md`.
 
+## Parallel group
+
+When the prompt names a parallel group and a work tree, other stages are being built at the same time, each in its own worktree. Read the group's section under *Parallel groups* in the plan.
+- Work only in your work tree, which may not be your current directory: absolute paths in Read, Edit and Write; the work tree as `path` in Grep and Glob; every Bash command starts in it (`cd "<work tree>" && …`, or `git -C "<work tree>" …`). Plan paths are relative to the work tree.
+- LSP answers come from the session's own checkout. Use them only for code no member of the group changes; for your own files, Grep in your work tree.
+- Change only your files in the group's *Files per member* list. Another member may own any other file, so needing one (a lockfile for a new dependency, a registration, a shared doc) is BLOCKED, not a deviation to explain.
+- The other members' changes are not in your tree, and their handoff notes do not exist yet: you build on nothing they do.
+
 ## Process
 
 1. List the plan's headings (Grep `^##` in the plan, with line numbers) and read only Architecture, Conventions, Measured facts, Contracts, your stage (with the shared block of its series, if it has one), and the decisions your stage lists under *Decisions used* (each under its `### D<n>` heading; read just those lines). Read the handoff notes of the stages yours depends on: they describe what was built and win over the plan's prediction. If your stage owns an open decision, decide it by the plan's criteria, and put the answer and its reason into your handoff note and your report.

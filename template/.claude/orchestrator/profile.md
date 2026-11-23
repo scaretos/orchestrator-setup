@@ -28,3 +28,12 @@ The project-specific values `/orchestrator-init` filled into the skills and agen
 | LSP_SETUP | | *Reading rules* in `CLAUDE.md`: per main language the LSP plugin, its server binary and how to install it |
 | MACHINE_TRAPS | | implementer, reviewer *This machine*: environment traps |
 | LAYOUT_ROWS | | `Explore` *Where things are* |
+
+## Switches
+
+Read by the skills each time they run: edit a value here and it applies to the next plan or execution, without re-running `/orchestrator-init`.
+
+- **Parallel stages:** on
+  - `on`: `/write-plan` may group stages that provably do not touch each other's work (its step 7), and `/execute-plan` runs each group at the same time, one worktree per member.
+  - `off`: `/write-plan` skips step 7 and writes no groups; the plan reviewer treats any group as a Must fix; `/execute-plan` runs the members of a group already written one after another, in the order listed, in the feature worktree.
+  - Off for one run only: `/write-plan --sequential <feature>`, or `/execute-plan <plan> --sequential`.

@@ -33,6 +33,7 @@ In a large codebase, one session can't hold a whole feature well:
 | **Every stage reviewed** | A fresh Opus reviewer per stage: plan fidelity, edge cases, tests that would actually fail if the code were wrong. Must fix items go back to the same implementer until the stage passes; a final review checks the seams between stages and runs the full verification. |
 | **Stop instead of guessing** | An implementer that hits an ambiguity, or a choice others would notice, reports BLOCKED. The orchestrator answers from the plan or asks you. |
 | **Mistakes found early** | A plan review that checks the plan's claims and the callers it touches against the code before anything is built, a planner self-check built from every defect reviewers had to catch before, and checks that run in the stage that produces the behaviour. |
+| **Parallel only where proven** | Stages that touch neither each other's files (side effects such as lockfiles, migrations and registrations included), code nor test resources can run at the same time, each in its own worktree. The planner writes the evidence for each group, the plan reviewer checks it against the code, and the orchestrator merges the stages in plan order and checks them together. A clash stops the run instead of being resolved by guesswork. |
 | **Small, fresh contexts** | One stage = one concern, grouped so no two stages read the same files, each in its own agent. The orchestrator works from short reports and never reads code, so it stays small for the whole build. |
 | **Tests from independent sources** | New tests only when they check against something other than the code itself: a real system, your decision, a fixed bug. They're written before the code, from the plan. |
 | **It learns** | `/retro` turns what each build taught into path-scoped rules. `/workflow-review` measures the workflow from transcripts and proposes changes, tracked in a ledger. |
@@ -192,6 +193,8 @@ The full reasoning is in [docs/how-it-works.md](docs/how-it-works.md). In short:
 **Do subagents save tokens?** Not automatically. Each one starts cold and reads its share again. They pay off when they keep contexts small over long work, and they cost extra on small work. Hence the ≤3-stage rule and the measurements in `/workflow-review`.
 
 **Why are reviews always Opus, even for Sonnet stages?** Measured findings per review were worth more than the review's cost: a defect found in review costs one fix round, while the same defect found later reopens the stages built on it. `/workflow-review` will tell you if that stops being true for your project.
+
+**Can stages run in parallel?** Yes, when the plan proves they're independent; see [Parallel groups](docs/how-it-works.md#parallel-groups). That proof is written and reviewed at planning time, because an execution that finds two stages clashing has nobody who understands both. Parallel stages save time, not tokens: each extra member costs one worktree prep. To turn them off, set `Parallel stages: off` under *Switches* in `.claude/orchestrator/profile.md` (it applies from the next run on), or pass `--sequential` to `/write-plan` or `/execute-plan` for one run.
 
 **Why do plans live outside the repo?** A git worktree can't see untracked files, and plans aren't code to commit. `~/.claude/plans/` is reachable from every worktree.
 
