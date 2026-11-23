@@ -16,12 +16,17 @@ to drop lines; it is not allowed to drop a fact without a reason.
 Usage:
   python verify_move.py loss  --old old/A.md old/B.md --new A/CLAUDE.md .claude/rules/*.md
   python verify_move.py loss --strict --old old/A.md --new A/CLAUDE.md
-  python verify_move.py facts --old old/A.md old/B.md --new A/CLAUDE.md .claude/rules/*.md
+  python verify_move.py facts --base <commit> --old CLAUDE.md docs/GUIDE.md --new CLAUDE.md .claude/rules/*.md
 
-Path arguments are normalized, so `/` and `\\` both work on Windows and POSIX.
+With --base, every --old path is read from that commit (git show), so a file
+that was edited in place, such as the root CLAUDE.md, or a guide already
+removed with git rm, is compared in its original form. Run it from the
+repository root. Path arguments are normalized, so `/` and `\\` both work on
+Windows and POSIX.
 """
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,8 +38,24 @@ def as_path(value):
     return Path(str(value).replace("\\", "/"))
 
 
-def read_lines(path: Path, skip_frontmatter=False):
-    text = path.read_text(encoding="utf-8-sig", errors="replace")
+BASE = None  # commit the old documents are read from (--base)
+
+
+def read_text(path: Path, from_base=False):
+    if from_base and BASE:
+        rel = path.as_posix()
+        rel = rel[2:] if rel.startswith("./") else rel
+        spec = f"{BASE}:./{rel}"
+        try:
+            raw = subprocess.run(["git", "show", spec], capture_output=True, check=True).stdout
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            sys.exit(f"cannot read {spec}: {exc}")
+        return raw.decode("utf-8-sig", errors="replace")
+    return path.read_text(encoding="utf-8-sig", errors="replace")
+
+
+def read_lines(path: Path, skip_frontmatter=False, from_base=False):
+    text = read_text(path, from_base)
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     if skip_frontmatter and lines and lines[0].strip() == "---":
         try:
@@ -54,10 +75,10 @@ def content_lines(lines):
         yield line.rstrip()
 
 
-def bag(paths, skip_frontmatter=False):
+def bag(paths, skip_frontmatter=False, from_base=False):
     counts = {}
     for path in paths:
-        for line in content_lines(read_lines(path, skip_frontmatter)):
+        for line in content_lines(read_lines(path, skip_frontmatter, from_base)):
             counts[line] = counts.get(line, 0) + 1
     return counts
 
@@ -67,7 +88,7 @@ def tokens(text):
 
 
 def missing_lines(old_paths, new_paths):
-    old = bag(old_paths)
+    old = bag(old_paths, from_base=True)
     new = bag(new_paths, skip_frontmatter=True)
     missing = []
     for line, count in old.items():
@@ -87,11 +108,14 @@ def main():
         action="store_true",
         help="exit 1 when an old line no longer appears verbatim (use only for an unchanged move)",
     )
+    parser.add_argument("--base", help="read every --old path from this commit instead of the working tree")
     args = parser.parse_args()
 
+    global BASE
+    BASE = args.base
     old_paths = [as_path(p) for p in args.old]
     new_paths = [as_path(p) for p in args.new]
-    for path in old_paths + new_paths:
+    for path in new_paths + ([] if BASE else old_paths):
         if not path.is_file():
             sys.exit(f"not a file: {path}")
 

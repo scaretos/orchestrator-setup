@@ -112,38 +112,55 @@ The skills and agents ship with placeholders (`{{TEST_CMD}}`) and ADAPT blocks (
 
 ## Auditing and optimizing the context: `/restructure-docs`
 
-A large codebase often carries two problems at once: documentation written for agents in files Claude Code never loads by itself, and documentation that no longer matches the implementation. A per-project guide named `X-CLAUDE.md`, a `docs/` folder, or a 30 KB root `CLAUDE.md` is only read because an instruction tells an agent to find it, grep its headings and read a range. Even a well-placed instruction can be wrong, outdated, duplicated or incomplete.
+A large codebase often has two problems at once. Documentation written for agents sits in files Claude Code never loads by itself, and some of it no longer matches the implementation. A per-project `X-GUIDE.md`, a `docs/` folder or a 30 KB root `CLAUDE.md` only gets read because an instruction tells an agent to find it, grep its headings and read a range. That happens in every session that needs it.
 
-`/restructure-docs` is a one-time audit and optimization of the Claude Code knowledge base, not a text migration. It keeps two kinds of truth separate: implementation, tests, build configuration and CI establish observable behavior, while owner decisions and architectural records establish intended behavior and design constraints. Existing documentation is historical context, not automatic authority. If the two disagree, the skill reports the discrepancy instead of silently treating either as correct. It is owner-invoked and has two permission gates:
+`/restructure-docs` is a one-time audit, not a text migration. It treats every instruction as a claim to verify. Implementation, tests, build configuration and CI establish observable behavior. Owner decisions and architectural records establish intended behavior. Where the two disagree, it reports the disagreement instead of picking one. It is owner-invoked, and it asks twice:
 
-1. **Warn, then ask.** Before reading anything, it explains the change, the risk and the reversibility, and asks whether to start the read-only audit.
-2. **Audit, then ask.** It inventories instructions as three separate buckets — modifiable Claude Code instructions, external evidence that is only read, and references that may need updating — then presents a findings table and the proposed destinations. Nothing is written until the owner approves that plan.
+1. **Before reading anything**, it explains what it changes and what it doesn't, and asks whether to start. In the same question it asks where work costs the most or goes wrong most often. That answer, plus the skill's argument, decides where the audit looks hardest.
+2. **After the read-only audit**, it writes the findings, the mapping, proposed skills, enforcement proposals and probe budgets to `audit.md` in the plans folder, outside the repository, and shows a summary. Nothing is written to the repository before the owner approves.
 
-The audit covers architecture, build and publish pipelines, tests, coding conventions, dependency injection, serialization and reflection, error handling and logging, security boundaries, feature flags, critical workflows, data, integrations, constraints and the development environment. A convention seen in one file is a hypothesis, not a project rule; a workaround is not an architectural pattern. The investigation is targeted by architectural boundary and cross-reference density, not just representative sampling.
+What it looks at:
 
-The goal is to reduce repeated exploration and prevent mistakes, not to describe everything the code contains. High-priority knowledge is architectural boundaries, critical invariants, non-obvious dependencies, dangerous pitfalls and cross-component workflows. Build/test commands and important configuration are medium priority. Obvious code structure and generic framework knowledge are low priority. Knowledge is promoted only when its expected value exceeds its context cost.
+- **Instruction sources in three groups.**
+  - Files it may change: `CLAUDE.md` files, rules, agent-only guides, project skills, and the project facts inside the orchestrator's agents and skills.
+  - Files it only reads and reports on: `CLAUDE.local.md`, settings and hooks, the profile, user configuration, auto memory, human docs and open plans.
+  - Context that is injected every session, such as hook output and always-on plugin skills, which can contradict `CLAUDE.md`.
+- **The change history.** `analyze_docs.py --history` lists the folder sets that change together most often. A recurring set is a kind of change the team makes again and again.
+- **The code**, starting where the value is: the owner's answer, the claims in the documents, and those recurring changes. A list of areas (architecture, build and release, composition, contracts, security, traps) is a gap checklist, not a mandate. A convention seen once is a hypothesis; only verified facts become instructions.
 
-What it changes follows from the evidence. Incorrect or outdated instructions are corrected. Duplicates are consolidated. Irrelevant context is removed with a justification. Missing knowledge is added when implementation, records or the owner support it. Persistent knowledge and procedures are kept apart:
+How it judges a finding: correct, incorrect or outdated, contradictory, duplicated, unsupported or missing. It also uses three verdicts taken from practice and from Anthropic's guidance on large codebases:
 
-- root `CLAUDE.md` for universal context, architecture overview, essential commands, pointers and traps — what the planner and orchestrator need;
-- a nested `CLAUDE.md` only where content is genuinely folder-wide;
-- `.claude/rules/` with `paths:` for technical facts, constraints and conventions that should load with matching code;
-- `.claude/agents/` for responsibilities and role-specific operating instructions;
-- `.claude/skills/` for reusable procedures and workflows.
+- **procedure:** step-by-step instructions sitting in context files, paid for in every session. They move into a skill.
+- **unenforced:** a `must` or `never` that a hook or deny rule could enforce, or a deny rule that matches nothing. It is proposed to the owner; settings are never edited.
+- **obsolete workaround:** an instruction that compensates for a model or tool limit that may be gone. The owner decides, because such rules can hold back newer models.
 
-Only project-specific factual context inside agents and skills may be corrected; operational instructions, stage contracts, permissions, responsibilities and workflow logic are immutable here, and apparent operational problems are separate `/workflow-review` recommendations. Human documentation stays in place. Orchestrator-managed sections of the root `CLAUDE.md` — the headings `/orchestrator-init` merges, ADAPT blocks and workflow instructions — are preserved. References inside Claude Code files are updated; references elsewhere change only when a removed agent-only document makes them invalid, and only with approval.
+Where things go:
 
-Editorial changes — grammar, clarity, formatting and rewording without changed meaning — do not need another approval. Adding a fact, removing a fact not listed for removal, moving content, changing rule path coverage, or merging or splitting rules does.
+- the root `CLAUDE.md`: pointers, critical traps and essential commands only;
+- a folder `CLAUDE.md`: only where content is genuinely folder-wide, such as the folder's test command and traps;
+- `.claude/rules/` with `paths:`: facts, constraints and conventions for a topic or feature, which may span folders. Each rule keeps its reason, so a later review can tell whether it still applies;
+- **new project skills:** a checklist for each recurring kind of change (every file it touches, with earlier commits to copy from, checked against today's tree), and procedures such as release steps that move out of the root file;
+- hooks and deny rules: proposals for the owner.
+
+Human documentation stays. So do the orchestrator-managed sections of the root `CLAUDE.md` and the workflow logic of its skills and agents.
+
+Each placement weighs what it costs in context:
+
+- the root file and rules without `paths:` load in every session;
+- a path-scoped rule stays loaded for the rest of the session once a matching file is opened;
+- even agents that skip `CLAUDE.md`, like a cheap `Explore` scout, still load path-scoped rules.
+
+So globs are kept narrow. Probe files, picked for each boundary, each shared file and a typical file for each recurring change, get a byte budget agreed with the owner.
 
 Verification is layered:
 
-- `check_rules.py` expands every `paths:` glob against `git ls-files`, reports dead globs, lists files that load several rules, and probes files — including one that should match zero rules — to show simulated matching. That is not proof of runtime loading: the model must be checked against the Claude Code version in use and its documentation.
-- `verify_move.py` is a review aid, not a proof. For a section moved unchanged, `loss --strict` is a gate. For a rewrite, `loss` and `facts` show which identifiers, numbers, paths or quoted names disappeared, so each can be restored or justified. Decisions, invariants, behavioral constraints and workflows are compared semantically.
-- An independent read-only reviewer receives the approved findings and mapping, original and resulting documentation, relevant source files and tests, and the verification results. It inspects implementation, tests and configuration directly rather than validating the implementer's reasoning. A finding that changes the approved plan needs the owner's approval before it is applied.
-- Unresolved uncertainties are reported separately from the applied changes.
+- `check_rules.py` expands every glob (including brace groups) against `git ls-files`. It fails on dead globs, lists rules without `paths:` as loaded at launch with their size, lists files that load several rules, and flags probes over the budget.
+- **Real loading:** a fresh `Explore` agent reads the probe files and reports which rules actually appeared in its context, compared with the simulation. The main session never reads probe files itself, because the rules would stay in its context for the rest of the run.
+- `verify_move.py --base <commit>` reads the originals from the base commit, even for files edited in place or already removed. `loss --strict` is a gate for sections moved unchanged. `facts` lists identifiers, numbers and paths that disappeared from rewritten ones.
+- An independent Opus reviewer works from `audit.md`, reads the originals with `git show`, and checks claims against the code itself. It is read-only, and the tree is checked to be unchanged afterwards. A finding that crosses the approval boundary goes back to the owner.
 
-`split_docs.py` remains an optional mechanical aid for sections that are already correct and only need a new home. Corrections and additions are made with evidence, not by preserving text.
+`split_docs.py` is an optional aid for moving a correct section without changing it. It refuses to leave a section without a home, and to overwrite an existing file that is not a source.
 
-The result is the layout the rest of the workflow assumes: a lean root `CLAUDE.md`, a short `CLAUDE.md` in each folder that needs one, and topic rules that load only when matching code is opened. It changes no product code, settings or hooks, and it works on a dedicated branch after verifying the default branch and base commit. It opens a draft PR when the repository has a remote and the tooling for it; otherwise the completed branch stays local. Documentation-only changes do not trigger expensive application-wide integration or deployment tests unless the change affects something those tests validate.
+The work happens on a branch made from the default branch's commit, never on the default branch itself. It ends with a draft PR where the repository supports one. The report lists what the owner should decide (enforcement, obsolete workarounds, contradictions with personal or user configuration, workflow problems for `/workflow-review`) and the open plans that cite removed headings. It also says how to measure the result: `/workflow-review` after the next 2–3 executions compares what agents actually loaded with the probe totals.
 
-If the repository is already well structured, the skill audits it instead of restructuring it, and proposes targeted corrections for wrong, missing, duplicated or contradictory facts.
+If the repository is already well structured, the skill audits it and proposes targeted corrections instead of restructuring.

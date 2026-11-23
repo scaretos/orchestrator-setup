@@ -23,7 +23,7 @@ Config shape:
     {
       "file": ".claude/rules/features/invoices.md",
       "title": "Invoices",
-      "paths": ["src/Lib/Invoices/**", "src/App/Pages/InvoicePage.cs"],
+      "paths": ["src/Lib/Invoices/**", "src/App/Views/InvoiceView.ts"],
       "parts": [
         {"source": "lib", "heading": "Invoices"},
         {"source": "app", "heading": "Invoice page", "rename": "The page in the app"}
@@ -45,6 +45,9 @@ Config shape:
 A part may also be {"raw": {"title": "Topic rules", "body": "..."}} for a short
 hand-written block. Every non-empty section of every source must appear in a
 part or in "drop"; the script refuses to write a split that would lose one.
+It also refuses to replace an existing file that is not a source (an existing
+folder CLAUDE.md, say) unless --overwrite is given. Headings inside fenced
+code blocks are content, not section breaks.
 
 Usage:
   python split_docs.py config.json --repo .            # dry run: sizes only
@@ -70,8 +73,11 @@ def posix(value):
 def read_sections(path: Path):
     text = path.read_text(encoding="utf-8-sig", errors="replace")
     atoms = [("(top)", [])]
+    fenced = False
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        match = HEADING.match(line)
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+        match = None if fenced else HEADING.match(line)
         if match:
             atoms.append((match.group(2).strip(), []))
         else:
@@ -98,6 +104,8 @@ def main():
     parser.add_argument("config", help="JSON split config")
     parser.add_argument("--repo", default=".", help="repository root (default: .)")
     parser.add_argument("--write", action="store_true", help="write the files (default: dry run)")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="allow replacing an existing file that is not a source")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
@@ -202,6 +210,19 @@ def main():
 
     if not outputs:
         sys.exit("config produced no files")
+
+    # A file that already exists and is not a source would be replaced without
+    # its content ever being checked: an existing folder CLAUDE.md or rule.
+    source_files = {posix(rel) for rel in sources.values()}
+    clobbered = sorted(rel for rel in outputs if (repo / rel).exists() and rel not in source_files)
+    if clobbered and not args.overwrite:
+        print("Refusing to write: these files exist and are not sources, so their content would be lost:",
+              file=sys.stderr)
+        for rel in clobbered:
+            print(f"  {rel}", file=sys.stderr)
+        print("Add each as a source and place its sections, or pass --overwrite after checking it.",
+              file=sys.stderr)
+        sys.exit(1)
 
     for rel, text in outputs.items():
         size = len(text.encode("utf-8"))

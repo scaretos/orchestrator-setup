@@ -82,35 +82,24 @@ class TemplateTests(unittest.TestCase):
         self.assertGreaterEqual(skill.count("AskUserQuestion"), 2)
         self.assertIn("disable-model-invocation: true", skill)
 
-    def test_restructure_docs_is_an_audit_not_a_migration(self):
+    def test_restructure_docs_steps_and_tables(self):
         skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
-        self.assertIn("Verified facts only", skill)
-        self.assertIn("Knowledge preservation, not verbatim preservation", skill)
-        self.assertIn("Unverifiable information is flagged", skill)
-        for column in ("Doc class", "Content class", "Status", "Consumer", "Change", "Original"):
+        steps = re.findall(r"^## (\d)\. ", skill, re.M)
+        self.assertEqual(steps, [str(i) for i in range(8)], "steps 0-7 in order")
+        for column in ("Doc class", "Content class", "Status", "Verdict", "Consumer", "Change", "Original"):
             with self.subTest(column=column):
-                self.assertIn(column, skill)
+                self.assertIn(f"| {column} |", skill)
 
-    def test_restructure_docs_truth_scope_and_value_model(self):
+    def test_restructure_docs_uses_its_argument_and_saves_the_audit(self):
         skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
-        required = (
-            "observable behavior",
-            "intended behavior",
-            "historical context, not automatic authority",
-            "Prioritize value over completeness",
-            "expected value exceeds its context cost",
-            "Operational instructions, stage contracts, permissions, responsibilities and workflow logic are immutable",
-            "Every material change must be traceable to an approved finding",
-            "simulated path-matching checks",
-            "match zero rules",
-            "relevant source files and tests",
-            "base commit",
-            "CLAUDE.local.md",
-            "user-global configuration",
-        )
-        for phrase in required:
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, skill)
+        self.assertIn("$ARGUMENTS", skill)
+        self.assertIn("{{PLANS_DIR}}/restructure-docs/<date>/audit.md", skill)
+
+    def test_restructure_docs_script_calls_use_the_profile_python(self):
+        skill = read(os.path.join(TEMPLATE, "skills", "restructure-docs", "SKILL.md"))
+        calls = re.findall(r"^\s*(\S+) \.claude/skills/restructure-docs/\w+\.py", skill, re.M)
+        self.assertTrue(calls)
+        self.assertEqual(set(calls), {"{{PYTHON}}"})
 
 
 if __name__ == "__main__":

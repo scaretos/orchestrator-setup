@@ -10,6 +10,7 @@ Usage:
   python analyze_docs.py --repo . CLAUDE.md docs/GUIDE.md src/Lib/LIB-CLAUDE.md
   python analyze_docs.py --repo . --json docs/*.md
   python analyze_docs.py --repo . --section "Steps" docs/GUIDE.md
+  python analyze_docs.py --repo . --history 6
 
 --section lists the paragraphs of one section with their sizes and references,
 for a section that holds several independent topics and needs paragraph-level
@@ -75,10 +76,13 @@ def build_resolver(files):
 
 
 def sections(text: str):
-    """Yield (heading, body) atoms. Every ## or ### heading starts a new atom."""
+    """Yield (heading, body) atoms. Every ## or ### heading outside a code fence starts a new atom."""
     atoms = [("(top)", [])]
+    fenced = False
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        match = HEADING.match(line)
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+        match = None if fenced else HEADING.match(line)
         if match:
             atoms.append((match.group(2).strip(), []))
         else:
@@ -111,8 +115,46 @@ def paragraphs(body: str):
     return result
 
 
+def history(repo: Path, months: int, excludes, depth: int = 2, top: int = 15):
+    """Which kinds of change recur: commits grouped by the folders they touch together."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo), "log", f"--since={months} months ago", "--no-merges",
+             "--name-only", "--format=@@%h %s"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        sys.exit(f"git log failed in {repo}: {exc}")
+    commits = []
+    for line in out.splitlines():
+        if line.startswith("@@"):
+            commits.append((line[2:], []))
+        elif line.strip() and commits:
+            f = line.strip().replace("\\", "/")
+            if not any(f.startswith(prefix) for prefix in excludes):
+                commits[-1][1].append(f)
+    file_counts, shapes = {}, {}
+    for header, changed in commits:
+        for f in set(changed):
+            file_counts[f] = file_counts.get(f, 0) + 1
+        folders = tuple(sorted({"/".join(f.split("/")[:depth]) if "/" in f else "(root)" for f in changed}))
+        if len(folders) > 1:
+            shapes.setdefault(folders, []).append(header)
+    print(f"{len(commits)} commits in the last {months} months\n")
+    print("Folder sets changed together most often (a recurring kind of change; candidates for a checklist skill):")
+    for folders, headers in sorted(shapes.items(), key=lambda kv: -len(kv[1]))[:top]:
+        print(f"{len(headers):5d}  {' + '.join(folders)}")
+        for header in headers[:3]:
+            print(f"         e.g. {header[:100]}")
+    print("\nFiles changed in the most commits:")
+    for f, count in sorted(file_counts.items(), key=lambda kv: -kv[1])[:top]:
+        print(f"{count:5d}  {f}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--history", type=int, metavar="MONTHS",
+                        help="instead of documents: the folder sets and files that changed together most often")
     parser.add_argument("--repo", default=".", help="repository root (default: .)")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
     parser.add_argument("--max-refs", type=int, default=12, help="references printed per section")
@@ -122,11 +164,16 @@ def main():
         default=".git/,.claude/worktrees/,node_modules/,vendor/,third_party/,third-party/,.venv/,dist/,build/,bin/,obj/,target/",
         help="comma-separated path prefixes treated as generated or vendored",
     )
-    parser.add_argument("docs", nargs="+", help="documents to analyse, relative to the repo")
+    parser.add_argument("docs", nargs="*", help="documents to analyse, relative to the repo")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
     excludes = tuple(x.strip() for x in args.exclude.split(",") if x.strip())
+    if args.history:
+        history(repo, args.history, excludes)
+        return
+    if not args.docs:
+        parser.error("name the documents to analyse, or pass --history MONTHS")
     files = git_files(repo, excludes)
     resolve = build_resolver(files)
 

@@ -111,7 +111,7 @@ Then, in Claude Code inside your project:
 
 It detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). Commit the result on a branch.
 
-If the project already has long documentation that agents have to find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, a `docs/` folder the instructions point at), `/orchestrator-init` will point you at `/restructure-docs`. It audits the Claude Code context against implementation, tests, build configuration and CI, plus explicit owner decisions and architectural records: it verifies existing instructions, corrects or removes what the evidence contradicts, reports disagreements, adds only high-value missing knowledge, and restructures the result into a lean root or folder `CLAUDE.md` plus path-scoped `.claude/rules/`. It changes nothing before you approve the audit and the mapping, and human documentation stays in place.
+If the project already has long documentation that agents have to find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, a `docs/` folder the instructions point at), `/orchestrator-init` will point you at `/restructure-docs`. It checks every instruction against the implementation, tests, build configuration and CI, and against explicit owner decisions. It corrects or removes what the evidence contradicts, reports disagreements, and adds only high-value missing knowledge. The result is a lean root `CLAUDE.md`, folder `CLAUDE.md` files where they earn their place, and path-scoped `.claude/rules/`. Procedures move into skills, including a checklist for each kind of change your git history shows recurring. Instructions that should be enforced come back as hook or deny-rule proposals. It changes nothing before you approve the audit, and it never touches settings, hooks, `CLAUDE.local.md` or human documentation.
 
 ## Daily use
 
@@ -121,7 +121,7 @@ If the project already has long documentation that agents have to find and read 
 | `/execute-plan <plan path>` | In a **new** session. Resumable: rerun it after an interruption, a usage limit or a new milestone. |
 | `/retro` | At the end of any piece of work (the orchestrator runs it itself). Proposes rule updates; writes nothing without your OK. |
 | `/workflow-review [runs]` | Every 2–3 executions. Measures and proposes workflow changes; writes nothing without your OK. |
-| `/restructure-docs` | Once, after setup, if the project has hand-read guides or a large `CLAUDE.md`. Audits the context against the code, then corrects, consolidates and restructures it; shows the audit first. |
+| `/restructure-docs` | Once, after setup, if the project has hand-read guides or a large `CLAUDE.md`. Audits the context against the code, then corrects, consolidates and restructures it, and adds checklist skills; shows the audit first. |
 | `/orchestrator-init` | Once after installing; again after upgrading or editing `.claude/orchestrator/profile.md`. |
 | `python3 .claude/skills/workflow-review/analyze.py receipt` | Any time: the cost receipt of your latest session (`--since 7` for the week). |
 
