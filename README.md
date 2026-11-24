@@ -8,7 +8,9 @@ You plan a feature once, in depth, in your own session (`/write-plan`). Claude r
 - **Each stage is reviewed.** A fresh Opus reviewer with no stake in the code checks it against the plan and runs its tests, and the stage goes back until it passes. Only then is it committed.
 - **Nobody guesses.** Implementers get the decisions, contracts and measured facts in writing. When the plan doesn't answer something, they stop and ask instead of inventing an answer and carrying on.
 
-Small contexts also make every turn cheaper, so the setup uses fewer tokens. That's a by-product you can measure ([below](#the-by-product-see-where-your-tokens-go)), not the goal.
+Orchestration has a price: it costs tokens a single session doesn't spend, because every agent starts cold and every review is extra work. This setup is built to keep that extra small. Small contexts make every turn cheaper, and in its measured runs the median implementing agent peaked at 156k tokens of context, against 297k when the same codebase was built with ad-hoc subagents ([evidence](docs/evidence.md)). For small work one session is still cheaper, and the skill tells you so. You can measure your own sessions ([below](#the-by-product-see-where-your-tokens-go)).
+
+> **Disclaimer:** I haven't made reproducible measurements that compare different orchestration setups. The numbers in this README are my own, from my own builds on one codebase, and the setup has given me good results there. Read them as one developer's experience, not as a benchmark.
 
 It came out of a real commercial codebase (a 7-project C#/.NET desktop application). Every rule in it exists because a measured run showed it was needed. See [docs/evidence.md](docs/evidence.md).
 
@@ -91,7 +93,7 @@ The receipt reads only the transcripts on your own machine (`~/.claude/projects`
 
 Not in the transcripts, so not on the receipt: requests Claude Code may make outside the conversation. It's an "API-equivalent" figure: a subscription doesn't bill per token, so for one it shows relative usage, not money spent.
 
-The workflow keeps these numbers down because it keeps every context small: in its measured runs, the median implementing agent peaked at 156k tokens of context, against 297k before it ([evidence](docs/evidence.md)).
+The workflow keeps these numbers down because it keeps every context small: in its measured runs, the median implementing agent peaked at 156k tokens of context, against 297k when the same codebase was built with ad-hoc subagents before it ([evidence](docs/evidence.md)).
 
 ## Quick start
 
