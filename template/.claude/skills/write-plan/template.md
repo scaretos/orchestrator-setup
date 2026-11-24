@@ -52,8 +52,18 @@ Decided by S<n>; criteria: ...; if A → ..., if B → ...
 - `{{GATE_CMD}}` (the final reviewer runs it)
 - <checks the gate leaves out that this feature needs, e.g. a slow or environment-bound suite; the final reviewer runs them after the gate>
 
+## Parallel groups
+<"none", or one heading per group of stages that run at the same time, each in its own worktree. Members are listed next to each other under *Stages*; the stages after a group start once the whole group is merged. Every line below is evidence the plan reviewer checks against the code: a group that is not provably independent is not a group.>
+
+### P1: S2, S3
+- **Why parallel:** <each member is a full implement-and-review cycle; the time saved is worth one extra worktree prep per member after the first>
+- **Files per member:** S2: `path/A`, `path/A.test`, `docs/x.md` *Heading* | S3: `path/B`, `path/B.test` (every file each member changes: *Files owned*, test files, fixtures, *Same piece of work* files, and the files its tools change as a side effect: lockfiles, generated code, snapshots, migrations and their numbering, registrations, index or barrel files, project and solution files; pairwise disjoint)
+- **Code between members:** none (no member calls, extends, tests or reads under *Read first* code another member changes)
+- **Runtime:** <what each member's *Verify* uses beyond its worktree (ports, databases, external accounts, devices, fixed temp paths), and why running them at the same time is safe, or "worktree only">
+- **Merge order:** S2, S3 (the listed order)
+
 ## Stages
-<Stages run in the order listed.>
+<Stages run in the order listed; the members of a parallel group run at the same time.>
 
 ### S1: <name>
 - **Depends on:** none | S<n> (only stages whose results this one builds on; its agent reads their handoff notes. Coming later is not a dependency.)
@@ -87,4 +97,4 @@ Decided by S<n>; criteria: ...; if A → ..., if B → ...
 - ...
 
 ## Execution log
-<Filled in by the orchestrator: worktree path, branch, start commit; per stage: commit, model, review rounds, changed files, decisions made during execution, deferred Should fix items, Learned lines; at the finish: date and PR.>
+<Filled in by the orchestrator: worktree path, branch, start commit; per stage: commit, model, review rounds, changed files, decisions made during execution, deferred Should fix items, Learned lines; per parallel group: base commit, each member's worktree, branch and commit, the merged commits and the group check's result; at the finish: date and PR.>

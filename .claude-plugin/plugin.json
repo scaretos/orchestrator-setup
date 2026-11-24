@@ -1,7 +1,7 @@
 {
   "name": "orchestrator-setup",
   "displayName": "Orchestrator setup",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Plan once, run each stage on a fresh Sonnet/Opus agent with an Opus review before commit. Installs the plan-and-execute workflow into a project and adapts it with /orchestrator-init.",
   "author": {
     "name": "scaretos",

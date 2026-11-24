@@ -33,6 +33,21 @@ The planner runs in your main session, because it needs you: every decision with
 - **Contracts:** exact signatures and shapes between stages, including error and empty cases.
 - **Stages,** each one concern, with the decisions it uses, the line ranges to read first, the tests to write before the code (inputs, expected result, source), edge cases, acceptance criteria and a verify command. Concerns that touch the same files share a stage. *Why:* a file read by two stages is paid for twice, and a file count says little about the work: a one-line change in twelve files is a small stage, two files the agent must understand in full can be a large one.
 
+### Parallel groups
+
+Stages that provably don't touch each other's work can run at the same time. The planner decides this, not the orchestrator, because the execution has no good way to resolve a clash: two agents that edited the same file, or one whose stage quietly relied on code the other changed, would need someone to understand both stages, and nobody in the execution has. So a group (`P1: S2, S3`) is written into the plan with its evidence, and each line of that evidence is checked by the self-check and again by the plan reviewer:
+
+- **No dependency** between members, directly or through a stage between them.
+- **Disjoint files**, counting more than *Files owned*: test files, fixtures, the docs and changelog of *Same piece of work*, and the files tools change as a side effect, such as a lockfile when a dependency is added, generated code, snapshots, migration numbers, registrations, and index or project files. These side-effect files are where "independent" stages usually collide.
+- **No shared code:** no member calls, extends, tests or reads code another member changes. The planner has already looked up those callers for the quality bar.
+- **Separate runtime:** the verify commands can run at the same time. A worktree separates files, not ports, databases or external accounts.
+- **Nothing decided inside the group:** no open decision and no owner check, since either can change a decision another member is building on.
+- **Worth it:** each member is a full implement-and-review cycle, at most three per group.
+
+Parallelism saves wall-clock time, not tokens: every member costs what it would cost sequentially, plus a worktree prep for each member after the first and one group check. A review fix that adds a file to a member can break its group, so after a revision both the planner and the reviewer check the whole group again.
+
+**Turning it off.** Parallel stages carry risks the sequential path doesn't have: worktree preps, a faster drain on the usage limit, and a stop at the merge when the proof was wrong. So they have a switch, `- **Parallel stages:** on | off` under *Switches* in `.claude/orchestrator/profile.md`. `/orchestrator-init` asks you about it, and the skills read it each time they run, so editing that one word applies to the next plan or execution. With `off`, `/write-plan` skips its grouping step entirely, the plan reviewer treats any group as a Must fix, and `/execute-plan` runs the members of a group already written one after another. That is always safe, since a group's members are independent. For a single run, `/write-plan --sequential …` or `/execute-plan <plan> --sequential` does the same. A profile from before 1.5.0 has no switch, and a missing switch counts as off.
+
 ### Why the plan's layout matters
 
 Agents read the plan by heading: they grep `^##`, then read only the lines of their own sections. So every decision has its own heading, a fact only one stage needs sits in that stage, and nothing is "see elsewhere". Measured before this layout: a third of the plan text agents read was outside their needs.
@@ -62,9 +77,11 @@ Per stage it:
 
 At the end come a final review of the seams between stages, the gate, a `FIX` stage for whatever is left, a draft PR, and `/retro`.
 
-### Why one agent at a time
+### Why one stage at a time, unless the plan groups them
 
-Parallel implementers on one branch conflict, and parallel reviews of unfinished work review the wrong thing. Sequential stages also let each one read the previous stages' handoff notes, which describe what was actually built, and those win over the plan's prediction.
+Parallel implementers in one working tree conflict: one agent's half-finished edit breaks the other's build, and parallel reviews of unfinished work review the wrong thing. Sequential stages also let each one read the previous stages' handoff notes, which describe what was actually built, and those win over the plan's prediction.
+
+A parallel group from the plan is the exception, and it runs so that none of this applies. The first member works in the feature worktree, and every other member gets its own worktree at the group's base commit, prepared like the first. Each member is implemented, reviewed and committed in its own tree, so its build, tests and diff show only its stage. The orchestrator also refuses to commit a file outside the member's listed files. When all members are committed, it cherry-picks them onto the feature branch in the plan's order, which leaves one commit per stage as usual, and then runs every member's verify command on the combined tree. A cherry-pick conflict or a failing group check means the plan's proof of independence was wrong. The orchestrator then stops and shows you, and never resolves the conflict itself; `/workflow-review` counts it as a plan defect.
 
 ### Why Sonnet for some stages, never for reviews
 
