@@ -2,6 +2,7 @@
 # Copy the orchestrator setup into a project's .claude/ folder.
 # Usage: ./install.sh [target-project-dir] [--force]
 # Existing files are kept unless --force is given; then run /orchestrator-init in Claude Code there.
+# The project's own data (orchestrator/profile.md, orchestrator/ledger.md) is never overwritten.
 set -euo pipefail
 
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/template/.claude"
@@ -24,8 +25,14 @@ copied=0; kept=0
 while IFS= read -r -d '' file; do
   rel="${file#"$src"/}"
   dest="$target/.claude/$rel"
-  if [[ -e "$dest" && $force -eq 0 ]]; then
-    echo "kept     .claude/$rel (exists; --force overwrites)"
+  data=0
+  [[ "$rel" == orchestrator/profile.md || "$rel" == orchestrator/ledger.md ]] && data=1
+  if [[ -e "$dest" && ( $data -eq 1 || $force -eq 0 ) ]]; then
+    if [[ $data -eq 1 ]]; then
+      echo "kept     .claude/$rel (project data, never overwritten)"
+    else
+      echo "kept     .claude/$rel (exists; --force overwrites)"
+    fi
     kept=$((kept + 1))
     continue
   fi

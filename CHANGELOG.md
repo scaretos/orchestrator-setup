@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0
+
+- Installable as a Claude Code plugin: `claude plugin marketplace add scaretos/orchestrator-setup`, `claude plugin install orchestrator-setup@orchestrator-setup`, then `/orchestrator-setup:install` in the project. The plugin only delivers the setup: its one skill copies the template into the project's `.claude/` with the installer and runs `/orchestrator-init`, so the skills stay project skills without a prefix, adapted in place and committed with the project. Run it again after `claude plugin update` to upgrade: it compares versions, shows the changelog entries in between and upgrades on a branch with the owner's OK.
+- The installers never overwrite `orchestrator/profile.md` and `orchestrator/ledger.md`, not even with `--force` / `-Force`. Before, an upgrade with `--force` reset the profile that `/orchestrator-init` was meant to re-apply and the ledger's history.
+- `install.ps1` warns, instead of failing, when the target is not a git repository (Windows PowerShell 5.1 made git's stderr fatal).
+- The template itself did not change: a project on 1.4.0 needs no upgrade.
+
 ## 1.4.0
 
 - `/orchestrator-init` sets up the language server (new step 8). For each main language it finds the plugin in the official marketplace whose `lspServers` serves the language's extensions, checks whether the plugin is installed and its server binary is on PATH, and asks once with the exact commands. It installs what the owner approves: the plugin at project scope by default (recorded in `.claude/settings.json`), the binary with a user-level installer. Commands that need `sudo` or an elevated shell are left to the owner. After `/reload-plugins` it checks that `findReferences` agrees with a Grep.

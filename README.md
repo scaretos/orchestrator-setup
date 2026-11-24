@@ -96,6 +96,23 @@ The workflow keeps these numbers down because it keeps every context small: in i
 
 Requirements: Claude Code with skills and subagents, git, Python 3 (for `/workflow-review` and `/restructure-docs`). Optional: Node (CRLF guard hook), `gh` (draft PRs). `/orchestrator-init` offers the language server for your main languages (exact `findReferences`).
 
+**As a Claude Code plugin** (recommended):
+
+```bash
+claude plugin marketplace add scaretos/orchestrator-setup
+claude plugin install orchestrator-setup@orchestrator-setup
+```
+
+Then, in Claude Code inside your project:
+
+```
+/orchestrator-setup:install
+```
+
+It copies the skills and agents into your project's `.claude/` and runs `/orchestrator-init`. The plugin only delivers the setup: the skills are adapted to your project in place and belong in your repository, so after installing you type them without a prefix (`/write-plan`, `/execute-plan`, …).
+
+**Without the plugin:** clone the repository and run the installer, then `/orchestrator-init` in Claude Code inside your project.
+
 ```bash
 git clone https://github.com/scaretos/orchestrator-setup.git
 cd your-project
@@ -103,13 +120,7 @@ cd your-project
 # ..\orchestrator-setup\install.ps1 -Target .   # Windows PowerShell
 ```
 
-Then, in Claude Code inside your project:
-
-```
-/orchestrator-init
-```
-
-It detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). For each main language without a working language server it offers the official Claude Code LSP plugin (at project scope, so it is recorded in `.claude/settings.json` for everyone who clones) and the server binary the plugin starts, which is a separate install; then it checks that `findReferences` agrees with a text search. Commit the result on a branch.
+`/orchestrator-init` detects your build and test commands, shell, layout and CI, asks only what it can't detect, fills every placeholder in the skills and agents, merges the workflow sections into your `CLAUDE.md`, creates a gate script if you have none, and offers settings (each part with its reason, applied only with your OK). For each main language without a working language server it offers the official Claude Code LSP plugin (at project scope, so it is recorded in `.claude/settings.json` for everyone who clones) and the server binary the plugin starts, which is a separate install; then it checks that `findReferences` agrees with a text search. Commit the result on a branch.
 
 If the project already has long documentation that agents have to find and read by hand (per-project guides, a root `CLAUDE.md` much over ~10 KB, a `docs/` folder the instructions point at), `/orchestrator-init` will point you at `/restructure-docs`. It checks every instruction against the implementation, tests, build configuration and CI, and against explicit owner decisions. It corrects or removes what the evidence contradicts, reports disagreements, and adds only high-value missing knowledge. The result is a lean root `CLAUDE.md`, folder `CLAUDE.md` files where they earn their place, and path-scoped `.claude/rules/`. Procedures move into skills, including a checklist for each kind of change your git history shows recurring. Instructions that should be enforced come back as hook or deny-rule proposals. It changes nothing before you approve the audit, and it never touches settings, hooks, `CLAUDE.local.md` or human documentation.
 
@@ -122,7 +133,8 @@ If the project already has long documentation that agents have to find and read 
 | `/retro` | At the end of any piece of work (the orchestrator runs it itself). Proposes rule updates; writes nothing without your OK. |
 | `/workflow-review [runs]` | Every 2–3 executions. Measures and proposes workflow changes; writes nothing without your OK. |
 | `/restructure-docs` | Once, after setup, if the project has hand-read guides or a large `CLAUDE.md`. Audits the context against the code, then corrects, consolidates and restructures it, and adds checklist skills; shows the audit first. |
-| `/orchestrator-init` | Once after installing; again after upgrading or editing `.claude/orchestrator/profile.md`. |
+| `/orchestrator-init` | Once after installing (`/orchestrator-setup:install` runs it for you); again after editing `.claude/orchestrator/profile.md`. |
+| `/orchestrator-setup:install` | Plugin only: once per project, and again after `claude plugin update` to upgrade. |
 | `python3 .claude/skills/workflow-review/analyze.py receipt` | Any time: the cost receipt of your latest session (`--since 7` for the week). |
 
 ## The self-improving part
@@ -180,7 +192,9 @@ The full reasoning is in [docs/how-it-works.md](docs/how-it-works.md). In short:
 ## Upgrading and customizing
 
 - Everything lives in your repository and belongs to you, so edit freely. `/workflow-review` will propose its own edits, too.
-- To upgrade, run the installer with `--force` / `-Force` on a branch, then `/orchestrator-init` (it reapplies `profile.md`), and review the diff to keep your own improvements.
+- To upgrade with the plugin: `claude plugin update orchestrator-setup@orchestrator-setup`, then `/orchestrator-setup:install` in the project. It shows what changed since your version and upgrades on a branch with your OK.
+- To upgrade without it: pull the clone, run the installer with `--force` / `-Force` on a branch, then `/orchestrator-init`.
+- Either way, `profile.md` and `ledger.md` are kept, `/orchestrator-init` reapplies the profile, and the diff shows what the upgrade overwrote: restore your own improvements from it.
 - Your stack's specifics (layers, traps, UI checks) live in the ADAPT blocks that `/orchestrator-init` writes. Better answers there make every run cheaper.
 
 ## FAQ
