@@ -1,0 +1,17 @@
+{
+  "name": "orchestrator-setup",
+  "owner": {
+    "name": "scaretos",
+    "url": "https://github.com/scaretos"
+  },
+  "description": "The orchestrator-setup plan-and-execute workflow for Claude Code.",
+  "plugins": [
+    {
+      "name": "orchestrator-setup",
+      "source": "./",
+      "description": "Plan once, run each stage on a fresh Sonnet/Opus agent with an Opus review before commit. A Claude Code workflow for large codebases.",
+      "category": "development",
+      "tags": ["orchestrator", "planning", "subagents", "code-review", "workflow"]
+    }
+  ]
+}

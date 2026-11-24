@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0
+
+- Installable as a Claude Code plugin: `claude plugin marketplace add scaretos/orchestrator-setup`, `claude plugin install orchestrator-setup@orchestrator-setup`, then `/orchestrator-setup:install` in the project. The plugin only delivers the setup: its one skill copies the template into the project's `.claude/` with the installer and runs `/orchestrator-init`, so the skills stay project skills without a prefix, adapted in place and committed with the project. Run it again after `claude plugin update` to upgrade: it compares versions, shows the changelog entries in between and upgrades on a branch with the owner's OK.
+- The installers never overwrite `orchestrator/profile.md` and `orchestrator/ledger.md`, not even with `--force` / `-Force`. Before, an upgrade with `--force` reset the profile that `/orchestrator-init` was meant to re-apply and the ledger's history.
+- `install.ps1` warns, instead of failing, when the target is not a git repository (Windows PowerShell 5.1 made git's stderr fatal).
+- The template itself did not change: a project on 1.5.0 needs no upgrade.
+
 ## 1.5.0
 
 - Parallel groups: stages that provably don't touch each other's work run at the same time, each in its own worktree.

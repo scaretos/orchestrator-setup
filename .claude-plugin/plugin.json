@@ -1,0 +1,15 @@
+{
+  "name": "orchestrator-setup",
+  "displayName": "Orchestrator setup",
+  "version": "1.6.0",
+  "description": "Plan once, run each stage on a fresh Sonnet/Opus agent with an Opus review before commit. Installs the plan-and-execute workflow into a project and adapts it with /orchestrator-init.",
+  "author": {
+    "name": "scaretos",
+    "url": "https://github.com/scaretos"
+  },
+  "homepage": "https://github.com/scaretos/orchestrator-setup",
+  "repository": "https://github.com/scaretos/orchestrator-setup",
+  "license": "MIT",
+  "keywords": ["orchestrator", "planning", "subagents", "code-review", "workflow", "large-codebases"],
+  "skills": "./plugin/skills/"
+}
